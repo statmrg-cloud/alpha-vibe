@@ -680,17 +680,20 @@ export default function DataPanel() {
               </div>
             ) : (
               <div className="space-y-1">
-                {portfolio.holdings.map((h) => (
+                {portfolio.holdings.map((h) => {
+                  const isKR = h.symbol.endsWith(".KS") || h.symbol.endsWith(".KQ");
+                  const holdingName = getStockName(h.symbol) || h.name || h.symbol;
+                  return (
                   <div
                     key={h.symbol}
                     onClick={() => setChartSymbol(h.symbol)}
                     className="flex items-center justify-between py-1.5 px-2 -mx-2 hover:bg-secondary/50 rounded cursor-pointer transition-all group"
                   >
                     <div className="font-mono">
-                      <div className="text-xs text-foreground font-medium group-hover:text-primary transition-colors">
-                        {h.name || getStockName(h.symbol) || h.symbol}
+                      <div className={`text-xs font-bold group-hover:text-primary transition-colors ${isKR ? "text-yellow-400" : "text-sky-400"}`}>
+                        {holdingName}
                       </div>
-                      <div className="text-[10px] text-muted-foreground/60">{h.symbol}</div>
+                      <div className="text-[10px] text-foreground/70 font-medium">{h.symbol}</div>
                     </div>
                     <div className="text-right font-mono">
                       <div className="text-xs text-foreground">{h.quantity}주</div>
@@ -721,7 +724,8 @@ export default function DataPanel() {
                       )}
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </div>
             )}
           </div>
@@ -765,11 +769,24 @@ export default function DataPanel() {
                       {t.type}
                     </Badge>
                     <div className="flex-1 min-w-0">
-                      <span className="text-foreground">{t.symbol}</span>
-                      {t.name && (
-                        <span className="text-muted-foreground/40 ml-1 text-[9px]">{t.name}</span>
-                      )}
-                      <span className="text-muted-foreground/50 ml-1">{t.quantity}주</span>
+                      {(() => {
+                        const isKR = t.symbol.endsWith(".KS") || t.symbol.endsWith(".KQ");
+                        const tradeName = getStockName(t.symbol) || t.name || "";
+                        return (
+                          <>
+                            <span className={`font-bold ${isKR ? "text-yellow-400" : "text-sky-400"}`}>
+                              {isKR && tradeName ? tradeName : t.symbol}
+                            </span>
+                            {!isKR && tradeName && (
+                              <span className="text-sky-400/70 ml-1 text-[9px]">{tradeName}</span>
+                            )}
+                            {isKR && (
+                              <span className="text-foreground/50 ml-1 text-[9px]">{t.symbol}</span>
+                            )}
+                            <span className="text-foreground/70 ml-1">{t.quantity}주</span>
+                          </>
+                        );
+                      })()}
                     </div>
                     <span className="text-muted-foreground/50 text-[10px] shrink-0">
                       {Math.round(t.total).toLocaleString()}
@@ -806,17 +823,20 @@ export default function DataPanel() {
           </div>
           <div className="px-3 pb-3">
             <div className="space-y-0.5">
-              {watchlist.map((stock) => (
+              {watchlist.map((stock) => {
+                const isKR = stock.symbol.endsWith(".KS") || stock.symbol.endsWith(".KQ");
+                const stockName = getStockName(stock.symbol) || stock.name || stock.symbol;
+                return (
                 <div
                   key={stock.symbol}
                   onClick={() => setChartSymbol(stock.symbol)}
                   className="flex items-center justify-between py-1.5 px-2 -mx-2 hover:bg-secondary/50 rounded cursor-pointer transition-all group"
                 >
                   <div className="font-mono">
-                    <div className="text-xs text-foreground font-medium group-hover:text-primary transition-colors">
-                      {stock.name || getStockName(stock.symbol) || stock.symbol}
+                    <div className={`text-xs font-bold group-hover:text-primary transition-colors ${isKR ? "text-yellow-400" : "text-sky-400"}`}>
+                      {stockName}
                     </div>
-                    <div className="text-[10px] text-muted-foreground/60">{stock.symbol}</div>
+                    <div className="text-[10px] text-foreground/70 font-medium">{stock.symbol}</div>
                   </div>
                   <div className="text-right font-mono">
                     {stock.loading ? (
@@ -833,7 +853,8 @@ export default function DataPanel() {
                     )}
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </div>
         </Card>

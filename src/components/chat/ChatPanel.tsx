@@ -254,11 +254,14 @@ export default function ChatPanel() {
                           <span className="text-[9px] font-mono text-muted-foreground/60 block tracking-wider">
                             PAPER TRADE (모의투자)
                           </span>
-                          {msg.symbols.map((sym) => (
+                          {msg.symbols.map((sym) => {
+                            const isKR = sym.endsWith(".KS") || sym.endsWith(".KQ");
+                            const displayName = msg.symbolNames?.[sym] || "";
+                            return (
                             <div key={`paper-${sym}`} className="flex items-center gap-1.5">
-                              <span className="text-[10px] font-mono text-foreground min-w-[55px]">{sym}</span>
-                              {msg.symbolNames?.[sym] && (
-                                <span className="text-[9px] font-mono text-muted-foreground/60">{msg.symbolNames[sym]}</span>
+                              <span className="text-[11px] font-mono text-primary font-bold min-w-[55px]">{sym}</span>
+                              {displayName && (
+                                <span className={`text-[10px] font-mono font-medium ${isKR ? "text-yellow-400" : "text-sky-400"}`}>{displayName}</span>
                               )}
                               <Button
                                 size="sm"
@@ -277,7 +280,8 @@ export default function ChatPanel() {
                                 매도
                               </Button>
                             </div>
-                          ))}
+                          );
+                          })}
                         </div>
                         {/* 실제 매매 (Alpaca) — US 주식만 */}
                         {msg.symbols.some((sym) => !sym.endsWith(".KS") && !sym.endsWith(".KQ")) && (
@@ -290,11 +294,13 @@ export default function ChatPanel() {
                               PAPER
                             </span>
                           </div>
-                          {msg.symbols.filter((sym) => !sym.endsWith(".KS") && !sym.endsWith(".KQ")).map((sym) => (
+                          {msg.symbols.filter((sym) => !sym.endsWith(".KS") && !sym.endsWith(".KQ")).map((sym) => {
+                            const displayName = msg.symbolNames?.[sym] || "";
+                            return (
                             <div key={`real-${sym}`} className="flex items-center gap-1.5">
-                              <span className="text-[10px] font-mono text-foreground min-w-[55px]">{sym}</span>
-                              {msg.symbolNames?.[sym] && (
-                                <span className="text-[9px] font-mono text-muted-foreground/60">{msg.symbolNames[sym]}</span>
+                              <span className="text-[11px] font-mono text-primary font-bold min-w-[55px]">{sym}</span>
+                              {displayName && (
+                                <span className="text-[10px] font-mono font-medium text-sky-400">{displayName}</span>
                               )}
                               <Button
                                 size="sm"
@@ -313,7 +319,8 @@ export default function ChatPanel() {
                                 실매도
                               </Button>
                             </div>
-                          ))}
+                          );
+                          })}
                         </div>
                         )}
                       </div>
