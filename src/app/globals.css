@@ -2,26 +2,124 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
+  /* Alpha-Vibe: 주식 터미널 다크 테마 — 항상 dark */
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 220 20% 4%;         /* #0a0e14 깊은 네이비 블랙 */
+    --foreground: 210 20% 88%;        /* #d4dae4 밝은 쿨 그레이 */
+    --card: 220 18% 7%;               /* #101520 카드 배경 */
+    --card-foreground: 210 20% 88%;
+    --popover: 220 18% 7%;
+    --popover-foreground: 210 20% 88%;
+    --primary: 142 72% 50%;           /* #22c55e 메인 그린 (상승/양봉) */
+    --primary-foreground: 220 20% 4%;
+    --secondary: 220 14% 11%;         /* 서브 패널 배경 (더 어둡게) */
+    --secondary-foreground: 210 20% 78%;
+    --muted: 220 14% 12%;
+    --muted-foreground: 215 15% 50%;
+    --accent: 199 89% 48%;            /* #0ea5e9 하이라이트 블루 */
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 56%;         /* #ef4444 하락/음봉 레드 */
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 14% 14%;            /* 보더 라인 (더 미묘하게) */
+    --input: 220 14% 14%;
+    --ring: 142 72% 50%;              /* 포커스 링도 그린 */
+    --chart-1: 142 72% 50%;           /* 그린 */
+    --chart-2: 0 72% 56%;             /* 레드 */
+    --chart-3: 199 89% 48%;           /* 블루 */
+    --chart-4: 45 93% 58%;            /* 앰버 */
+    --chart-5: 270 70% 60%;           /* 퍼플 */
+    --radius: 0.5rem;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* 스크롤바 — 미니멀 스타일 */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(220 14% 18%);
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(220 14% 26%);
+  }
+
+  /* 선택 색상 */
+  ::selection {
+    background: hsl(142 72% 50% / 0.2);
+    color: hsl(142 72% 70%);
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+  /* 터미널 글로우 효과 */
+  .glow-green {
+    text-shadow: 0 0 8px hsl(142 72% 50% / 0.4);
+  }
+  .glow-red {
+    text-shadow: 0 0 8px hsl(0 72% 56% / 0.4);
+  }
+  .glow-blue {
+    text-shadow: 0 0 8px hsl(199 89% 48% / 0.4);
+  }
+  /* 가격 상승/하락 색상 */
+  .text-up {
+    @apply text-[hsl(142,72%,50%)];
+  }
+  .text-down {
+    @apply text-[hsl(0,72%,56%)];
+  }
+  /* 터미널 그리드 라인 (더 미묘하게) */
+  .terminal-grid {
+    background-image:
+      linear-gradient(hsl(220 14% 14% / 0.15) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(220 14% 14% / 0.15) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  /* 카드 호버 효과 */
+  .card-hover {
+    @apply transition-all duration-200;
+  }
+  .card-hover:hover {
+    box-shadow: 0 0 0 1px hsl(220 14% 20%),
+                0 4px 16px hsl(220 20% 4% / 0.5);
+  }
+}
+
+/* Recharts 차트 커스텀 */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: hsl(220 14% 14% / 0.5);
+}
+
+.recharts-tooltip-cursor {
+  stroke: hsl(210 20% 88% / 0.1);
+}
+
+/* 차트 영역 부드러운 전환 */
+.recharts-area-area {
+  transition: opacity 0.3s ease;
+}
+
+.recharts-active-dot circle {
+  filter: drop-shadow(0 0 4px currentColor);
 }
