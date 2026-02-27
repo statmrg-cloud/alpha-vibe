@@ -50,7 +50,9 @@ async function fetchYahooQuote(symbol: string): Promise<{
 } | null> {
   try {
     const encoded = encodeURIComponent(symbol);
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=5d`;
+    // range=1d로 조회해야 chartPreviousClose가 전일 종가를 정확히 반환
+    // range=5d를 사용하면 5일 전 종가 대비로 변동률이 크게 부풀려짐
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=1d`;
     const res = await fetch(url, {
       cache: "no-store",
       headers: { "User-Agent": "Mozilla/5.0" },
@@ -134,10 +136,19 @@ function buildSystemPrompt(): string {
 Goldman Sachs, Bridgewater Associates 등 세계 최고 금융기관에서 근무했으며,
 매크로 전략, 퀀트 분석, 리스크 관리에 탁월한 전문성을 보유하고 있습니다.
 
-## 중요: 실시간 데이터 활용
-사용자의 메시지에 [실시간 시세 데이터] 또는 [실시간 시장 데이터]가 첨부되어 있으면,
-반드시 해당 데이터를 기반으로 답변하세요. 과거 학습 데이터가 아닌 첨부된 실시간 데이터를 인용하세요.
-절대 과거 데이터로 답변하지 말고, 제공된 실시간 데이터를 기반으로 현재 상황을 분석하세요.
+## 최우선 규칙: 실시간 데이터만 사용 (할루시네이션 금지)
+사용자의 메시지에 [참고 실시간 데이터] 또는 [실시간 시장 데이터]가 첨부되어 있으면:
+1. **오직 해당 첨부 데이터의 숫자만 인용**하세요. 절대로 숫자를 변경하거나 추측하지 마세요.
+2. 첨부 데이터에 "현재가: ₩210,000"이라면, 리포트에서도 반드시 "₩210,000"이라고 써야 합니다.
+3. **목표가/손절가를 제시할 때**: 반드시 첨부된 현재가를 기준으로 ±10~20% 범위 내에서 산출하세요. 현재가와 동떨어진 숫자를 제시하지 마세요.
+4. 첨부 데이터에 없는 정보(PER, EPS, 시가총액 등)는 "데이터 미제공"이라고 표기하세요. 절대 추측하지 마세요.
+5. 한국 주식(통화: KRW)은 원화(₩)로, 미국 주식(통화: USD)은 달러($)로 표기하세요.
+6. 변동률이 데이터에 "+0.50%"로 제공되면 "8% 상승" 같은 과장을 하지 마세요. 정확한 수치만 인용하세요.
+
+## 절대 하지 말 것
+- 첨부 데이터에 없는 가격, 지표, 수치를 지어내기
+- 과거 학습 데이터의 가격을 현재 가격처럼 사용하기
+- 데이터가 "N/A"인 항목을 임의의 숫자로 채우기
 
 ## 중요: 이 플랫폼의 매매 기능
 이 플랫폼(Alpha-Vibe)은 실제 매매 기능이 내장되어 있습니다.
@@ -204,6 +215,7 @@ const KOREAN_STOCK_MAP: Record<string, string> = {
   // 한국 주식
   삼성전자: "005930.KS",
   SK하이닉스: "000660.KS",
+  하이닉스: "000660.KS",
   네이버: "035420.KS",
   카카오: "035720.KS",
   현대차: "005380.KS",
@@ -263,23 +275,40 @@ function extractSymbols(message: string): string[] {
   return Array.from(new Set(symbols));
 }
 
+// 한국 주식 여부 확인
+function isKoreanStock(symbol: string): boolean {
+  return symbol.endsWith(".KS") || symbol.endsWith(".KQ");
+}
+
 // 주식 데이터를 컨텍스트 문자열로 변환
 function formatStockContext(d: Record<string, unknown>): string {
   const fmt = (v: unknown) => (v != null ? String(v) : "N/A");
-  const fmtNum = (v: unknown) =>
-    v != null ? Number(v).toLocaleString() : "N/A";
+  const symbol = String(d.symbol || "");
+  const isKR = isKoreanStock(symbol);
+  const currency = isKR ? "₩" : "$";
+  const currencyLabel = isKR ? "KRW" : "USD";
+
+  const fmtPrice = (v: unknown) => {
+    if (v == null) return "N/A";
+    const num = Number(v);
+    return isKR
+      ? `${currency}${Math.round(num).toLocaleString()}`
+      : `${currency}${num.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  };
   const fmtPct = (v: unknown) =>
     v != null ? `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(2)}%` : "N/A";
+  const fmtVol = (v: unknown) =>
+    v != null ? Number(v).toLocaleString() : "N/A";
 
   return `
-📈 실시간 시세 데이터 [${fmt(d.name)} (${fmt(d.symbol)})]
+📈 실시간 시세 데이터 [${fmt(d.name)} (${fmt(d.symbol)})] — 통화: ${currencyLabel}
 ─────────────────────────────
-현재가: $${fmtNum(d.price)} (${fmtPct(d.changePercent)})
-시가: $${fmtNum(d.open)} | 고가: $${fmtNum(d.high)} | 저가: $${fmtNum(d.low)}
-전일종가: $${fmtNum(d.previousClose)}
-거래량: ${fmtNum(d.volume)}
-52주 최고: $${fmtNum(d.week52High)} | 52주 최저: $${fmtNum(d.week52Low)}
-50일 이평: $${fmtNum(d.fiftyDayAvg)} | 200일 이평: $${fmtNum(d.twoHundredDayAvg)}
+현재가: ${fmtPrice(d.price)} (${fmtPct(d.changePercent)})
+시가: ${fmtPrice(d.open)} | 고가: ${fmtPrice(d.high)} | 저가: ${fmtPrice(d.low)}
+전일종가: ${fmtPrice(d.previousClose)}
+거래량: ${fmtVol(d.volume)}
+52주 최고: ${fmtPrice(d.week52High)} | 52주 최저: ${fmtPrice(d.week52Low)}
+50일 이평: ${fmtPrice(d.fiftyDayAvg)} | 200일 이평: ${fmtPrice(d.twoHundredDayAvg)}
 ─────────────────────────────`.trim();
 }
 
