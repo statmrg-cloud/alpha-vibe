@@ -10,6 +10,7 @@ import RealTradeModal from "@/components/trade/RealTradeModal";
 
 interface ExtendedChatMessage extends ChatMessage {
   symbols?: string[];
+  symbolNames?: Record<string, string>;
 }
 
 interface TradeModalState {
@@ -165,12 +166,14 @@ export default function ChatPanel() {
       }
 
       const symbols = data.symbols || [];
+      const symbolNames = data.symbolNames || {};
       const aiMsg: ExtendedChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: data.message,
         timestamp: new Date(),
         symbols,
+        symbolNames,
       };
       setMessages((prev) => [...prev, aiMsg]);
 
@@ -254,6 +257,9 @@ export default function ChatPanel() {
                           {msg.symbols.map((sym) => (
                             <div key={`paper-${sym}`} className="flex items-center gap-1.5">
                               <span className="text-[10px] font-mono text-foreground min-w-[55px]">{sym}</span>
+                              {msg.symbolNames?.[sym] && (
+                                <span className="text-[9px] font-mono text-muted-foreground/60">{msg.symbolNames[sym]}</span>
+                              )}
                               <Button
                                 size="sm"
                                 onClick={() => handleTrade(sym, "BUY")}
@@ -287,6 +293,9 @@ export default function ChatPanel() {
                           {msg.symbols.filter((sym) => !sym.endsWith(".KS") && !sym.endsWith(".KQ")).map((sym) => (
                             <div key={`real-${sym}`} className="flex items-center gap-1.5">
                               <span className="text-[10px] font-mono text-foreground min-w-[55px]">{sym}</span>
+                              {msg.symbolNames?.[sym] && (
+                                <span className="text-[9px] font-mono text-muted-foreground/60">{msg.symbolNames[sym]}</span>
+                              )}
                               <Button
                                 size="sm"
                                 onClick={() => handleRealTrade(sym, "buy")}

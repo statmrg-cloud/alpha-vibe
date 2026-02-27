@@ -336,11 +336,16 @@ export async function POST(request: NextRequest) {
 
     // 2. 종목 데이터 + 시장 개요 데이터 조회
     let stockContext = "";
+    const symbolNames: Record<string, string> = {};
 
     // 2a. 개별 종목 데이터
     if (symbols.length > 0) {
       const stockResults = await Promise.all(symbols.map(fetchYahooQuote));
       const validResults = stockResults.filter(Boolean);
+
+      for (const r of validResults) {
+        if (r) symbolNames[r.symbol] = r.name;
+      }
 
       if (validResults.length > 0) {
         stockContext =
@@ -388,6 +393,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       message: assistantMessage,
       symbols,
+      symbolNames,
       stockData: symbols.length > 0 ? true : false,
     });
   } catch (error) {

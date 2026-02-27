@@ -766,6 +766,9 @@ export default function DataPanel() {
                     </Badge>
                     <div className="flex-1 min-w-0">
                       <span className="text-foreground">{t.symbol}</span>
+                      {t.name && (
+                        <span className="text-muted-foreground/40 ml-1 text-[9px]">{t.name}</span>
+                      )}
                       <span className="text-muted-foreground/50 ml-1">{t.quantity}주</span>
                     </div>
                     <span className="text-muted-foreground/50 text-[10px] shrink-0">
