@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import YahooFinance from "yahoo-finance2";
 
-const yf = new YahooFinance();
+export const dynamic = "force-dynamic";
+
+// 타임프레임별 Yahoo Finance 설정
+const TIMEFRAME_CONFIG: Record<string, { range: string; interval: string }> = {
+  "1D": { range: "1d", interval: "5m" },
+  "1W": { range: "5d", interval: "15m" },
+  "1M": { range: "1mo", interval: "1d" },
+  "3M": { range: "3mo", interval: "1d" },
+  "1Y": { range: "1y", interval: "1wk" },
+  "5Y": { range: "5y", interval: "1mo" },
+};
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get("symbol");
+  const timeframe = searchParams.get("timeframe") || "1M";
 
   if (!symbol) {
     return NextResponse.json(
@@ -15,29 +25,47 @@ export async function GET(request: NextRequest) {
   }
 
   const upperSymbol = symbol.toUpperCase().trim();
+  const config = TIMEFRAME_CONFIG[timeframe] || TIMEFRAME_CONFIG["1M"];
 
   try {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 10); // 주말 고려하여 10일 전부터
-
-    const result = await yf.chart(upperSymbol, {
-      period1: startDate,
-      period2: endDate,
-      interval: "1d",
+    const encoded = encodeURIComponent(upperSymbol);
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=${config.interval}&range=${config.range}`;
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { "User-Agent": "Mozilla/5.0" },
     });
 
-    const quotes = result.quotes
-      .filter((q) => q.close != null)
-      .slice(-7) // 최근 7거래일
-      .map((q) => ({
-        date: new Date(q.date).toISOString().split("T")[0],
-        open: q.open ?? 0,
-        high: q.high ?? 0,
-        low: q.low ?? 0,
-        close: q.close ?? 0,
-        volume: q.volume ?? 0,
-      }));
+    if (!res.ok) {
+      throw new Error(`Yahoo Finance API error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    const result = data?.chart?.result?.[0];
+    if (!result) throw new Error("No chart data");
+
+    const timestamps = result.timestamp || [];
+    const quote = result.indicators?.quote?.[0] || {};
+    const opens = quote.open || [];
+    const highs = quote.high || [];
+    const lows = quote.low || [];
+    const closes = quote.close || [];
+    const volumes = quote.volume || [];
+
+    const quotes = timestamps
+      .map((ts: number, i: number) => {
+        const close = closes[i];
+        if (close == null) return null;
+        return {
+          time: ts,
+          date: new Date(ts * 1000).toISOString(),
+          open: opens[i] ?? close,
+          high: highs[i] ?? close,
+          low: lows[i] ?? close,
+          close,
+          volume: volumes[i] ?? 0,
+        };
+      })
+      .filter(Boolean);
 
     const firstClose = quotes.length > 0 ? quotes[0].close : 0;
     const lastClose = quotes.length > 0 ? quotes[quotes.length - 1].close : 0;
@@ -46,6 +74,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       symbol: upperSymbol,
+      timeframe,
       quotes,
       change,
       changePercent,
