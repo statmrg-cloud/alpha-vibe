@@ -108,7 +108,7 @@ npm run dev
 - 분석 결과에 **매수/매도 버튼**이 자동으로 나타납니다
 
 ### 오른쪽: 데이터 패널
-- 주가 차트 (7일간 추이)
+- 프로 차트 (1분봉~5년봉, 캔들스틱, 기술적 지표)
 - 모의투자 포트폴리오 현황 (KR/US 모두 지원)
 - 설정 (Alpaca 계좌 표시 ON/OFF)
 - Alpaca 계좌/포지션 (설정에서 활성화 시)
@@ -211,15 +211,46 @@ Alpaca 계좌 패널은 기본적으로 **비활성화**되어 있습니다.
 
 > 한국 주식은 Alpaca에서 지원하지 않습니다. 미국 주식만 실매매 가능합니다.
 
-### 4-5. 주가 차트
+### 4-5. 주가 차트 (프로 차트)
 
 우측 패널 상단의 **PRICE CHART** 에서 확인합니다.
 
 - 기본 종목 탭: AAPL, NVDA, MSFT, TSLA
 - 보유 종목도 탭에 자동 추가됩니다
 - **관심종목 (WATCHLIST)** 클릭 시 해당 종목 차트로 전환
-- 초록색 = 7일간 상승 추세, 빨간색 = 7일간 하락 추세
-- 차트 위에 마우스를 올리면 상세 가격 표시
+
+#### 타임프레임
+| 버튼 | 설명 |
+|------|------|
+| **1분** | 1분봉 (당일 데이터) |
+| **30분** | 30분봉 (5일 데이터) |
+| **60분** | 60분봉 (5일 데이터) |
+| **1일** | 5분봉 (당일 데이터) |
+| **1주** | 15분봉 (5일 데이터) |
+| **1개월** | 일봉 (1개월 데이터) |
+| **3개월** | 일봉 (3개월 데이터) |
+| **1년** | 주봉 (1년 데이터) |
+| **5년** | 월봉 (5년 데이터) |
+
+#### 차트 타입
+- **캔들** / **라인** 전환 가능
+
+#### 줌 & 이동
+- **마우스 스크롤** → 줌인/줌아웃
+- **마우스 왼쪽 드래그** → 차트 좌우 이동 (패닝)
+- **+/- 버튼** → 줌 조절
+- **리셋 버튼** → 전체 보기 복원
+
+#### 오버레이 지표 (⚙ 설정 버튼)
+- SMA 20 / SMA 50 / SMA 200 (이동평균선)
+- 볼린저밴드
+- 골든크로스 / 데드크로스 (GC/DC)
+
+#### 하단 지표 (복수 선택 가능)
+- **거래량** — 매수/매도 거래량 바 차트
+- **CCI** — -100/+100 기준선, 과매수/과매도 판단
+- **RSI** — 30(과매도)/70(과매수) 기준선
+- **MACD** — MACD, 시그널, 히스토그램
 
 ---
 
@@ -365,7 +396,7 @@ alpha-vibe/
 │   │   ├── globals.css                 # 터미널 다크 테마 CSS
 │   │   └── api/
 │   │       ├── stock/route.ts          # 종목 시세 API (Yahoo + Alpaca 폴백)
-│   │       ├── stock/history/route.ts  # 7일 주가 히스토리 API
+│   │       ├── stock/history/route.ts  # 주가 히스토리 API (분봉~월봉)
 │   │       ├── market/route.ts         # 시장 지수 API (S&P, NASDAQ 등)
 │   │       ├── chat/route.ts           # AI 분석 API (Claude Sonnet)
 │   │       ├── trade/route.ts          # Alpaca 주문 실행 API
@@ -381,15 +412,17 @@ alpha-vibe/
 │   │   ├── chat/ChatPanel.tsx          # AI 채팅 패널 (메인 인터페이스)
 │   │   ├── data/DataPanel.tsx          # 우측 데이터 패널 (차트, 포트폴리오 등)
 │   │   ├── data/AlpacaAccountPanel.tsx # Alpaca 계좌/포지션 패널
-│   │   ├── chart/StockChart.tsx        # 주가 차트 (recharts AreaChart)
+│   │   ├── chart/StockChart.tsx        # 프로 차트 (캔들스틱/라인, 줌, 지표)
 │   │   ├── trade/TradeModal.tsx        # 모의투자 매매 모달 (환율 자동 적용)
 │   │   ├── trade/RealTradeModal.tsx    # Alpaca 실매매 모달 (3단계 확인)
 │   │   └── autotrade/AutoTradePanel.tsx# 자동매매 제어 UI [US ONLY]
 │   ├── contexts/PortfolioContext.tsx    # 포트폴리오 상태 Context
 │   ├── hooks/usePortfolio.ts           # 모의투자 로직 (localStorage)
+│   ├── lib/chart/
+│   │   └── indicators.ts              # 차트 기술적 지표 (SMA, CCI, RSI, MACD, BB)
 │   ├── lib/autotrade/
 │   │   ├── engine.ts                   # 자동매매 엔진 (cron + AI + Alpaca)
-│   │   └── indicators.ts              # 기술적 지표 계산 (RSI, MACD 등)
+│   │   └── indicators.ts              # 자동매매 기술적 지표 (RSI, MACD 등)
 │   └── types/index.ts                  # TypeScript 타입 정의
 └── package.json
 ```
@@ -409,7 +442,9 @@ alpha-vibe/
 ### Step 2: 차트 확인
 1. 우측 패널 상단 차트가 로딩되는지 확인
 2. AAPL, NVDA, MSFT, TSLA 탭 클릭하여 차트 전환
-3. 차트 위에 마우스 올려서 툴팁 확인
+3. 타임프레임(1분/30분/60분/1일/1주/1개월/3개월/1년/5년) 전환 확인
+4. 캔들/라인 차트 전환, 스크롤 줌, 드래그 이동 확인
+5. ⚙ 설정 → SMA, CCI, RSI 등 지표 표시 확인
 
 ### Step 3: 모의투자 테스트
 1. AI 분석 결과의 **[매수]** 버튼 클릭

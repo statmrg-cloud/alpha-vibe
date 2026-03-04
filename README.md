@@ -12,12 +12,12 @@
 | 기능 | 설명 |
 |------|------|
 | **AI 투자 분석** | Claude Sonnet이 월가 헤지펀드 전략가로 종목 분석 |
-| **실시간 시세** | Yahoo Finance REST API 실시간 주가 데이터 |
+| **실시간 시세** | Yahoo Finance + 네이버증권 복수 데이터 소스 종합 분석 |
 | **모의투자 (KR/US)** | 1억원 가상 자금으로 한국+미국 주식 매수/매도 연습 |
 | **USD→KRW 환율 자동 반영** | 미국 주식 모의투자 시 실시간 환율로 원화 환산 |
 | **Alpaca 실매매 (US)** | Paper Trading API로 미국 주식 실제 시장가 주문 |
 | **자동매매 (US ONLY)** | 10분 간격 기술적 지표 + AI 분석 → 미국 주식 자동 매수 |
-| **주가 차트** | 7일 주가 추이 (상승=초록, 하락=빨간) |
+| **프로 차트** | 캔들스틱/라인 차트, 분봉(1분/30분/60분)~5년봉, 줌/드래그, 기술적 지표 |
 | **Alpaca 계좌 패널** | 설정에서 활성화하여 Alpaca 계좌 잔고/포지션 확인 |
 | **일일 손실 제한** | Stop-loss 자동 중지 기능 |
 
@@ -100,8 +100,8 @@ npm run dev
 - **언어**: TypeScript
 - **스타일**: Tailwind CSS + shadcn/ui
 - **AI**: Anthropic Claude Sonnet 4
-- **주가 데이터**: Yahoo Finance REST API + Alpaca Data API
-- **차트**: Recharts (AreaChart)
+- **주가 데이터**: Yahoo Finance REST API + 네이버증권 API + Alpaca Data API
+- **차트**: Recharts (캔들스틱/라인 + SMA/CCI/RSI/MACD/볼린저밴드)
 - **자동매매**: node-cron + 기술적 지표 (RSI, MACD, SMA, 볼린저밴드)
 - **매매**: Alpaca Paper Trading API
 - **상태관리**: React Context + localStorage
@@ -123,6 +123,7 @@ alpha-vibe/
 │   │       ├── exchange-rate/  # USD/KRW 환율 API
 │   │       └── autotrade/      # 자동매매 API
 │   ├── components/             # UI 컴포넌트
+│   ├── lib/chart/              # 차트 기술적 지표 계산 (SMA, CCI, RSI 등)
 │   ├── lib/autotrade/          # 자동매매 엔진 + 기술적 지표
 │   └── hooks/                  # 포트폴리오 훅
 ├── MANUAL.md                   # 상세 사용자 매뉴얼 (한글)
