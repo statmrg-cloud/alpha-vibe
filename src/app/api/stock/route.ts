@@ -24,7 +24,105 @@ interface StockResponse {
   week52High: number | null;
   week52Low: number | null;
   dividendYield: number | null;
-  source: "yahoo" | "alpaca";
+  source: "yahoo" | "alpaca" | "naver";
+}
+
+// 한국 주식 여부 확인
+function isKoreanStock(symbol: string): boolean {
+  return symbol.endsWith(".KS") || symbol.endsWith(".KQ");
+}
+
+// 네이버 콤마 숫자 파싱: "189,300" → 189300
+function parseNaverNumber(value: string | number | undefined | null): number {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === "number") return value;
+  return Number(value.replace(/,/g, "")) || 0;
+}
+
+// 네이버증권 API로 실시간 시세 가져오기 (한국 주식 전용, delayTime=0 실시간)
+async function fetchFromNaver(symbol: string): Promise<StockResponse> {
+  const code = symbol.replace(/\.(KS|KQ)$/, "");
+  const headers = { "User-Agent": "Mozilla/5.0" };
+
+  // basic(실시간 현재가) + price(OHLCV) + integration(PER/EPS/시총) 병렬 호출
+  const [basicRes, priceRes, integrationRes] = await Promise.all([
+    fetch(`https://m.stock.naver.com/api/stock/${code}/basic`, { headers, cache: "no-store" }),
+    fetch(`https://m.stock.naver.com/api/stock/${code}/price`, { headers, cache: "no-store" }),
+    fetch(`https://m.stock.naver.com/api/stock/${code}/integration`, { headers, cache: "no-store" }),
+  ]);
+
+  if (!basicRes.ok) throw new Error(`Naver basic API error: ${basicRes.status}`);
+
+  const basicData = await basicRes.json();
+  const priceData = priceRes.ok ? await priceRes.json() : [];
+  const integrationData = integrationRes.ok ? await integrationRes.json() : null;
+
+  // basic: 실시간 현재가
+  const price = parseNaverNumber(basicData.closePrice);
+  const change = parseNaverNumber(basicData.compareToPreviousClosePrice);
+  const changePercent = parseFloat(basicData.fluctuationsRatio) || 0;
+  const stockName = basicData.stockName || code;
+
+  // price[0]: 오늘 OHLCV (일별 데이터의 첫번째)
+  const today = Array.isArray(priceData) && priceData.length > 0 ? priceData[0] : null;
+  const openPrice = today ? parseNaverNumber(today.openPrice) : price;
+  const highPrice = today ? parseNaverNumber(today.highPrice) : price;
+  const lowPrice = today ? parseNaverNumber(today.lowPrice) : price;
+  const volume = today ? parseNaverNumber(today.accumulatedTradingVolume) : 0;
+
+  // price[1]: 전일 종가
+  const yesterday = Array.isArray(priceData) && priceData.length > 1 ? priceData[1] : null;
+  const previousClose = yesterday ? parseNaverNumber(yesterday.closePrice) : price - change;
+
+  // integration: PER, EPS, 시총 등
+  let marketCap: number | null = null;
+  let pe: number | null = null;
+  let eps: number | null = null;
+  let dividendYield: number | null = null;
+
+  if (integrationData?.totalInfos) {
+    const infos = integrationData.totalInfos;
+    const getVal = (key: string): string | null => {
+      const item = infos.find((i: { key: string; value: string }) => i.key === key);
+      return item?.value ?? null;
+    };
+
+    const perStr = getVal("PER");
+    const epsStr = getVal("EPS");
+    const capStr = getVal("시총");
+    const divStr = getVal("배당수익률");
+
+    if (perStr) pe = parseFloat(perStr.replace(/,/g, "")) || null;
+    if (epsStr) eps = parseFloat(epsStr.replace(/,/g, "")) || null;
+    if (capStr) {
+      // 시총: "1,127,301억" → 억 단위 → 원 단위로 변환
+      const capNum = parseFloat(capStr.replace(/[,억원조\s]/g, ""));
+      if (capStr.includes("조")) marketCap = capNum * 1e12;
+      else if (capStr.includes("억")) marketCap = capNum * 1e8;
+      else marketCap = capNum;
+    }
+    if (divStr) dividendYield = parseFloat(divStr.replace(/%/g, "")) || null;
+  }
+
+  return {
+    symbol,
+    name: stockName,
+    price,
+    change,
+    changePercent,
+    open: openPrice,
+    high: highPrice,
+    low: lowPrice,
+    previousClose,
+    volume,
+    marketCap,
+    pe,
+    eps,
+    week52High: null,
+    week52Low: null,
+    dividendYield,
+    source: "naver",
+  };
 }
 
 // Yahoo Finance로 종목 데이터 가져오기
@@ -107,9 +205,32 @@ export async function GET(request: NextRequest) {
   }
 
   const upperSymbol = symbol.toUpperCase().trim();
+  const isKR = isKoreanStock(upperSymbol);
+
+  // 한국 주식: 네이버증권(실시간) → Yahoo(fallback)
+  // 미국 주식: Yahoo → Alpaca(fallback)
+  if (isKR) {
+    try {
+      const data = await fetchFromNaver(upperSymbol);
+      return NextResponse.json(data);
+    } catch (naverError) {
+      console.warn(`네이버증권 실패 (${upperSymbol}):`, naverError);
+      // fallback: Yahoo Finance
+      try {
+        const data = await fetchFromYahoo(upperSymbol);
+        return NextResponse.json(data);
+      } catch (yahooError) {
+        console.warn(`Yahoo Finance 실패 (${upperSymbol}):`, yahooError);
+      }
+      return NextResponse.json(
+        { error: `종목 데이터를 가져올 수 없습니다: ${upperSymbol}` },
+        { status: 500 }
+      );
+    }
+  }
 
   try {
-    // 1차: Yahoo Finance
+    // 미국 주식 1차: Yahoo Finance
     const data = await fetchFromYahoo(upperSymbol);
     return NextResponse.json(data);
   } catch (yahooError) {
