@@ -370,7 +370,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
 
       const rect = container.getBoundingClientRect();
       const deltaX = e.clientX - dragStartRef.current.x;
-      const deltaPct = -(deltaX / rect.width) * (dragStartRef.current.startRange[1] - dragStartRef.current.startRange[0]);
+      const deltaPct = (deltaX / rect.width) * (dragStartRef.current.startRange[1] - dragStartRef.current.startRange[0]);
 
       const range = dragStartRef.current.startRange[1] - dragStartRef.current.startRange[0];
       let newStart = dragStartRef.current.startRange[0] + deltaPct;
