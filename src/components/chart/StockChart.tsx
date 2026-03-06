@@ -187,7 +187,9 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   const [showSettings, setShowSettings] = useState(false);
 
   // 줌 상태: 전체 데이터 중 보여줄 범위 (0~1 비율)
-  const [zoomRange, setZoomRange] = useState<[number, number]>([0, 1]);
+  // 기본값: 최근 1/3만 표시 (나머지 2/3는 오른쪽 드래그로 과거 탐색 가능)
+  const DEFAULT_ZOOM: [number, number] = [0.67, 1];
+  const [zoomRange, setZoomRange] = useState<[number, number]>(DEFAULT_ZOOM);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   // 드래그 패닝 상태
@@ -260,9 +262,9 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
     };
   }, [fetchLivePrice, fetchChartData]);
 
-  // 타임프레임 변경 시 줌 리셋
+  // 타임프레임 변경 시 줌 리셋 (기본 뷰: 최근 1/3)
   useEffect(() => {
-    setZoomRange([0, 1]);
+    setZoomRange(DEFAULT_ZOOM);
   }, [timeframe]);
 
   // 마우스 휠 줌 핸들러 — document 레벨 캡처로 ScrollArea보다 먼저 잡음
@@ -455,7 +457,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
     return chartData.slice(startIdx, endIdx);
   }, [chartData, zoomRange]);
 
-  const isZoomed = zoomRange[0] > 0.001 || zoomRange[1] < 0.999;
+  const isZoomed = Math.abs(zoomRange[0] - DEFAULT_ZOOM[0]) > 0.01 || Math.abs(zoomRange[1] - DEFAULT_ZOOM[1]) > 0.01;
 
   // 골든/데드크로스 신호
   const crossSignals = useMemo(() => {
@@ -813,7 +815,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
             <>
               <span className="text-muted-foreground/40 mx-0.5">{Math.round((zoomRange[1] - zoomRange[0]) * 100)}%</span>
               <button
-                onClick={() => setZoomRange([0, 1])}
+                onClick={() => setZoomRange(DEFAULT_ZOOM)}
                 className="px-1 py-0.5 rounded bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
               >
                 리셋

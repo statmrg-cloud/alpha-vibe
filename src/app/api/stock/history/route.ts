@@ -2,17 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-// 타임프레임별 Yahoo Finance 설정
+// 타임프레임별 Yahoo Finance 설정 (3배 확장 로딩 → 드래그로 과거 데이터 탐색 가능)
 const TIMEFRAME_CONFIG: Record<string, { range: string; interval: string }> = {
-  "1m": { range: "1d", interval: "1m" },
-  "30m": { range: "5d", interval: "30m" },
-  "60m": { range: "5d", interval: "60m" },
-  "1D": { range: "1d", interval: "5m" },
-  "1W": { range: "5d", interval: "15m" },
-  "1M": { range: "1mo", interval: "1d" },
-  "3M": { range: "3mo", interval: "1d" },
-  "1Y": { range: "1y", interval: "1wk" },
-  "5Y": { range: "5y", interval: "1mo" },
+  "1m": { range: "3d", interval: "1m" },
+  "30m": { range: "1mo", interval: "30m" },
+  "60m": { range: "1mo", interval: "60m" },
+  "1D": { range: "3d", interval: "5m" },
+  "1W": { range: "1mo", interval: "15m" },
+  "1M": { range: "3mo", interval: "1d" },
+  "3M": { range: "1y", interval: "1d" },
+  "1Y": { range: "3y", interval: "1wk" },
+  "5Y": { range: "max", interval: "1mo" },
 };
 
 export async function GET(request: NextRequest) {
