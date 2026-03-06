@@ -39,7 +39,42 @@ function parseNaverNumber(value: string | number | undefined | null): number {
   return Number(value.replace(/,/g, "")) || 0;
 }
 
-// 네이버증권 API로 실시간 시세 가져오기 (한국 주식 전용, delayTime=0 실시간)
+// 네이버증권 경량 모드: /basic API 1개만 호출 (가격+등락만, ~100ms)
+async function fetchFromNaverLite(symbol: string): Promise<StockResponse> {
+  const code = symbol.replace(/\.(KS|KQ)$/, "");
+  const res = await fetch(`https://m.stock.naver.com/api/stock/${code}/basic`, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Naver basic API error: ${res.status}`);
+  const data = await res.json();
+
+  const price = parseNaverNumber(data.closePrice);
+  const change = parseNaverNumber(data.compareToPreviousClosePrice);
+  const changePercent = parseFloat(data.fluctuationsRatio) || 0;
+
+  return {
+    symbol,
+    name: data.stockName || code,
+    price,
+    change,
+    changePercent,
+    open: 0,
+    high: 0,
+    low: 0,
+    previousClose: price - change,
+    volume: 0,
+    marketCap: null,
+    pe: null,
+    eps: null,
+    week52High: null,
+    week52Low: null,
+    dividendYield: null,
+    source: "naver",
+  };
+}
+
+// 네이버증권 API 풀모드: basic + price + integration 3개 병렬 호출 (전체 데이터)
 async function fetchFromNaver(symbol: string): Promise<StockResponse> {
   const code = symbol.replace(/\.(KS|KQ)$/, "");
   const headers = { "User-Agent": "Mozilla/5.0" };
@@ -206,12 +241,16 @@ export async function GET(request: NextRequest) {
 
   const upperSymbol = symbol.toUpperCase().trim();
   const isKR = isKoreanStock(upperSymbol);
+  const lite = searchParams.get("lite") === "true";  // 경량 모드 (가격만 빠르게)
 
   // 한국 주식: 네이버증권(실시간) → Yahoo(fallback)
   // 미국 주식: Yahoo → Alpaca(fallback)
   if (isKR) {
     try {
-      const data = await fetchFromNaver(upperSymbol);
+      // lite 모드: /basic 1개만 호출 (~100ms), full 모드: 3개 병렬 호출
+      const data = lite
+        ? await fetchFromNaverLite(upperSymbol)
+        : await fetchFromNaver(upperSymbol);
       return NextResponse.json(data);
     } catch (naverError) {
       console.warn(`네이버증권 실패 (${upperSymbol}):`, naverError);

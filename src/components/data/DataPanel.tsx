@@ -194,7 +194,7 @@ export default function DataPanel() {
     await Promise.all(
       portfolio.holdings.map(async (h) => {
         try {
-          const res = await fetch(`/api/stock?symbol=${encodeURIComponent(h.symbol)}`);
+          const res = await fetch(`/api/stock?symbol=${encodeURIComponent(h.symbol)}&lite=true`);
           if (res.ok) {
             const data = await res.json();
             prices[h.symbol] = data.price || 0;
@@ -208,7 +208,7 @@ export default function DataPanel() {
   useEffect(() => {
     if (isLoaded && portfolio.holdings.length > 0) {
       fetchHoldingPrices();
-      const interval = setInterval(fetchHoldingPrices, 10000);  // 10초마다 보유종목 갱신
+      const interval = setInterval(fetchHoldingPrices, 5000);  // 5초마다 보유종목 갱신 (lite 모드)
       return () => clearInterval(interval);
     } else if (isLoaded && portfolio.holdings.length === 0) {
       setHoldingPrices({});
@@ -285,7 +285,7 @@ export default function DataPanel() {
     const updated = await Promise.all(
       WATCHLIST_SYMBOLS.map(async (item) => {
         try {
-          const res = await fetch(`/api/stock?symbol=${encodeURIComponent(item.symbol)}`);
+          const res = await fetch(`/api/stock?symbol=${encodeURIComponent(item.symbol)}&lite=true`);
           if (!res.ok) return { ...item, price: 0, changePercent: 0, loading: false };
           const data = await res.json();
           return {
@@ -305,7 +305,7 @@ export default function DataPanel() {
 
   useEffect(() => {
     fetchWatchlistData();
-    const interval = setInterval(fetchWatchlistData, 10000);  // 10초마다 관심종목 갱신
+    const interval = setInterval(fetchWatchlistData, 5000);  // 5초마다 관심종목 갱신 (lite 모드)
     return () => clearInterval(interval);
   }, [fetchWatchlistData]);
 

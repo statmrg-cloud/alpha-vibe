@@ -224,7 +224,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
 
   const fetchLivePrice = useCallback(async () => {
     try {
-      const res = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`);
+      const res = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}&lite=true`);
       if (!res.ok) return;
       const json = await res.json();
       const newPrice = json.price || 0;
@@ -250,7 +250,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   }, [fetchChartData, fetchLivePrice]);
 
   useEffect(() => {
-    const priceInterval = setInterval(fetchLivePrice, 5000);     // 5초마다 실시간 가격
+    const priceInterval = setInterval(fetchLivePrice, 3000);     // 3초마다 실시간 가격 (lite 모드)
     const chartInterval = setInterval(fetchChartData, 60000);    // 1분마다 차트 갱신
     return () => {
       clearInterval(priceInterval);
