@@ -208,7 +208,7 @@ export default function DataPanel() {
   useEffect(() => {
     if (isLoaded && portfolio.holdings.length > 0) {
       fetchHoldingPrices();
-      const interval = setInterval(fetchHoldingPrices, 30000);
+      const interval = setInterval(fetchHoldingPrices, 10000);  // 10초마다 보유종목 갱신
       return () => clearInterval(interval);
     } else if (isLoaded && portfolio.holdings.length === 0) {
       setHoldingPrices({});
@@ -305,7 +305,7 @@ export default function DataPanel() {
 
   useEffect(() => {
     fetchWatchlistData();
-    const interval = setInterval(fetchWatchlistData, 60000);
+    const interval = setInterval(fetchWatchlistData, 10000);  // 10초마다 관심종목 갱신
     return () => clearInterval(interval);
   }, [fetchWatchlistData]);
 

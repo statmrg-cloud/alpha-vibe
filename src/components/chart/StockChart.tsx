@@ -250,8 +250,8 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   }, [fetchChartData, fetchLivePrice]);
 
   useEffect(() => {
-    const priceInterval = setInterval(fetchLivePrice, 15000);
-    const chartInterval = setInterval(fetchChartData, 300000);
+    const priceInterval = setInterval(fetchLivePrice, 5000);     // 5초마다 실시간 가격
+    const chartInterval = setInterval(fetchChartData, 60000);    // 1분마다 차트 갱신
     return () => {
       clearInterval(priceInterval);
       clearInterval(chartInterval);
