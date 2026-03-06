@@ -193,6 +193,8 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   // 드래그 패닝 상태
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ x: number; startRange: [number, number] } | null>(null);
+  const zoomRangeRef = useRef(zoomRange);
+  useEffect(() => { zoomRangeRef.current = zoomRange; }, [zoomRange]);
 
   const [indicators, setIndicators] = useState<IndicatorSettings>({
     sma20: true,
@@ -348,6 +350,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   }, []);
 
   // 드래그 패닝 핸들러 (마우스 왼쪽 클릭 후 좌우 이동)
+  // zoomRangeRef를 사용하여 이벤트 리스너가 드래그 중 재생성되지 않도록 함
   useEffect(() => {
     if (loading) return;
 
@@ -359,8 +362,9 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
       if (e.button !== 0) return; // 왼쪽 클릭만
 
       e.preventDefault();
+      e.stopPropagation();
       setIsDragging(true);
-      dragStartRef.current = { x: e.clientX, startRange: [...zoomRange] as [number, number] };
+      dragStartRef.current = { x: e.clientX, startRange: [...zoomRangeRef.current] as [number, number] };
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -368,9 +372,11 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
       const container = chartContainerRef.current;
       if (!container) return;
 
+      e.preventDefault();
       const rect = container.getBoundingClientRect();
       const deltaX = e.clientX - dragStartRef.current.x;
-      const deltaPct = (deltaX / rect.width) * (dragStartRef.current.startRange[1] - dragStartRef.current.startRange[0]);
+      // 오른쪽 드래그(deltaX>0) → 과거(왼쪽) 데이터, 왼쪽 드래그(deltaX<0) → 미래(오른쪽) 데이터
+      const deltaPct = -(deltaX / rect.width) * (dragStartRef.current.startRange[1] - dragStartRef.current.startRange[0]);
 
       const range = dragStartRef.current.startRange[1] - dragStartRef.current.startRange[0];
       let newStart = dragStartRef.current.startRange[0] + deltaPct;
@@ -390,14 +396,14 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
     };
 
     document.addEventListener("mousedown", handleMouseDown, { capture: true });
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("mousemove", handleMouseMove, { capture: true });
+    document.addEventListener("mouseup", handleMouseUp, { capture: true });
     return () => {
       document.removeEventListener("mousedown", handleMouseDown, { capture: true });
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("mousemove", handleMouseMove, { capture: true });
+      document.removeEventListener("mouseup", handleMouseUp, { capture: true });
     };
-  }, [loading, zoomRange]);
+  }, [loading]);
 
   // ─── 지표 계산 ──────────────────────────────────────
   const chartData: ChartDataPoint[] = useMemo(() => {
