@@ -92,6 +92,20 @@ const STOCK_SEARCH_DB: Array<{ name: string; symbol: string; keywords: string[] 
   { name: "에코프로", symbol: "086520.KS", keywords: ["에코프로"] },
   { name: "한미반도체", symbol: "042700.KS", keywords: ["한미반도체", "한미"] },
   { name: "SK이노베이션", symbol: "096770.KS", keywords: ["sk이노", "sk"] },
+  { name: "기업은행", symbol: "024110.KS", keywords: ["기업은행", "ibk", "기은"] },
+  { name: "우리금융지주", symbol: "316140.KS", keywords: ["우리금융", "우리은행", "우리"] },
+  { name: "하나금융지주", symbol: "086790.KS", keywords: ["하나금융", "하나은행", "하나"] },
+  { name: "SK텔레콤", symbol: "017670.KS", keywords: ["sk텔레콤", "skt", "sk"] },
+  { name: "KT", symbol: "030200.KS", keywords: ["kt", "케이티"] },
+  { name: "LG전자", symbol: "066570.KS", keywords: ["lg전자", "lg"] },
+  { name: "삼성SDS", symbol: "018260.KS", keywords: ["삼성sds", "삼성"] },
+  { name: "SK", symbol: "034730.KS", keywords: ["sk", "에스케이"] },
+  { name: "LG", symbol: "003550.KS", keywords: ["lg", "엘지"] },
+  { name: "HD한국조선해양", symbol: "009540.KS", keywords: ["한국조선", "hd현대", "현대"] },
+  { name: "SK스퀘어", symbol: "402340.KS", keywords: ["sk스퀘어", "sk"] },
+  { name: "삼성전자우", symbol: "005935.KS", keywords: ["삼성전자우", "삼성우선주"] },
+  { name: "현대건설", symbol: "000720.KS", keywords: ["현대건설", "현대"] },
+  { name: "NH투자증권", symbol: "005940.KS", keywords: ["nh투자", "nh증권", "농협"] },
 ];
 
 export default function DataPanel() {

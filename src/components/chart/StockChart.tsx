@@ -111,6 +111,16 @@ const TICKER_TO_KOREAN_NAME: Record<string, string> = {
   "006800.KS": "미래에셋증권", "012450.KS": "한화에어로스페이스",
   "042660.KS": "한화오션", "247540.KS": "에코프로비엠",
   "086520.KS": "에코프로", "042700.KS": "한미반도체",
+  "024110.KS": "기업은행", "316140.KS": "우리금융지주",
+  "017670.KS": "SK텔레콤", "030200.KS": "KT", "066570.KS": "LG전자",
+  "018260.KS": "삼성SDS", "034730.KS": "SK", "003550.KS": "LG",
+  "009540.KS": "HD한국조선해양", "402340.KS": "SK스퀘어", "005935.KS": "삼성전자우",
+  "000720.KS": "현대건설", "005940.KS": "NH투자증권",
+  "096770.KS": "SK이노베이션", "034020.KS": "두산에너빌리티",
+  "329180.KS": "HD현대중공업", "003670.KS": "POSCO퓨처엠",
+  "032830.KS": "삼성생명", "000810.KS": "삼성화재",
+  "009150.KS": "삼성전기", "010140.KS": "삼성중공업",
+  "323410.KS": "카카오뱅크", "377300.KS": "카카오페이",
 };
 
 // ─── 캔들스틱 커스텀 Shape ─────────────────────────────
@@ -205,6 +215,45 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
     bb: false,
     gcdc: false,
   });
+
+  // SMA200용 일봉 데이터 (분봉 차트에서 진짜 200일선을 그리기 위함)
+  const [dailySma200, setDailySma200] = useState<Map<string, number>>(new Map());
+  const isIntradayTimeframe = ["1m", "30m", "60m", "1D", "1W"].includes(timeframe);
+  const needsDailySma200 = indicators.sma200 && (isIntradayTimeframe || timeframe === "1M");
+
+  // SMA200용 일봉 데이터 별도 fetch (분봉/1M에서 200일선 계산)
+  useEffect(() => {
+    if (!needsDailySma200) {
+      setDailySma200(new Map());
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        // 2년치 일봉 = ~500 거래일 → SMA200 계산에 충분
+        const res = await fetch(
+          `/api/stock/history?symbol=${encodeURIComponent(symbol)}&timeframe=sma200`
+        );
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+        const quotes: OHLCV[] = json.quotes || [];
+        if (quotes.length < 200) return;
+
+        // 일봉으로 SMA200 계산
+        const smaValues = calcSMA(quotes, 200);
+        const smaMap = new Map<string, number>();
+        quotes.forEach((q, i) => {
+          if (smaValues[i] !== null) {
+            // 날짜 키: "2026-03-09" 형식
+            const dateKey = new Date(q.date).toISOString().slice(0, 10);
+            smaMap.set(dateKey, smaValues[i] as number);
+          }
+        });
+        if (!cancelled) setDailySma200(smaMap);
+      } catch { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, [symbol, needsDailySma200]);
 
   // ─── 데이터 fetch ──────────────────────────────────
   const fetchChartData = useCallback(async () => {
@@ -413,7 +462,8 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
 
     const sma20 = indicators.sma20 ? calcSMA(rawData, 20) : null;
     const sma50 = indicators.sma50 ? calcSMA(rawData, 50) : null;
-    const sma200 = indicators.sma200 ? calcSMA(rawData, 200) : null;
+    // SMA200: 분봉/1M에서는 별도 일봉 데이터로 계산 (dailySma200), 3M+ 에서는 차트 데이터로 직접 계산
+    const sma200FromChart = (indicators.sma200 && !needsDailySma200) ? calcSMA(rawData, 200) : null;
     const bb = indicators.bb ? calcBollingerBands(rawData) : null;
     const cci = subIndicators.has("cci") ? calcCCI(rawData) : null;
     const rsi = subIndicators.has("rsi") ? calcRSI(rawData) : null;
@@ -421,6 +471,26 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
 
     return rawData.map((d, i) => {
       const isUp = d.close >= d.open;
+
+      // SMA200: 분봉/1M인 경우 일봉 SMA200에서 해당 날짜 값을 매핑
+      let sma200Val: number | null = null;
+      if (sma200FromChart) {
+        sma200Val = sma200FromChart[i];
+      } else if (needsDailySma200 && dailySma200.size > 0) {
+        const dateKey = new Date(d.date).toISOString().slice(0, 10);
+        sma200Val = dailySma200.get(dateKey) ?? null;
+        // 분봉 차트에서 정확한 날짜 매핑이 안 되면, 가장 가까운 이전 날짜 사용
+        if (sma200Val === null) {
+          const keys = Array.from(dailySma200.keys()).sort();
+          for (let k = keys.length - 1; k >= 0; k--) {
+            if (keys[k] <= dateKey) {
+              sma200Val = dailySma200.get(keys[k]) ?? null;
+              break;
+            }
+          }
+        }
+      }
+
       return {
         idx: i,
         date: d.date,
@@ -436,7 +506,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
         isUp,
         sma20: sma20 ? sma20[i] : null,
         sma50: sma50 ? sma50[i] : null,
-        sma200: sma200 ? sma200[i] : null,
+        sma200: sma200Val,
         bbUpper: bb ? bb.upper[i] : null,
         bbMiddle: bb ? bb.middle[i] : null,
         bbLower: bb ? bb.lower[i] : null,
@@ -447,7 +517,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
         macdHist: macd ? macd.histogram[i] : null,
       };
     });
-  }, [rawData, indicators, subIndicators]);
+  }, [rawData, indicators, subIndicators, needsDailySma200, dailySma200]);
 
   // ─── 줌 적용된 가시 데이터 ──────────────────────────────
   const visibleData = useMemo(() => {

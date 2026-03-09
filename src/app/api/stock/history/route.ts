@@ -13,6 +13,7 @@ const TIMEFRAME_CONFIG: Record<string, { range: string; interval: string }> = {
   "3M": { range: "1y", interval: "1d" },
   "1Y": { range: "3y", interval: "1wk" },
   "5Y": { range: "max", interval: "1mo" },
+  "sma200": { range: "2y", interval: "1d" },  // SMA200 계산용 일봉 2년치 (~500 거래일)
 };
 
 export async function GET(request: NextRequest) {
