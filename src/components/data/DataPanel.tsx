@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -112,7 +112,7 @@ export default function DataPanel() {
   const { portfolio, isLoaded, resetPortfolio } = usePortfolioContext();
   const [chartSymbol, setChartSymbol] = useState("AAPL");
   const [symbolInput, setSymbolInput] = useState("");
-  const [suggestions, setSuggestions] = useState<typeof STOCK_SEARCH_DB>([]);
+  const [suggestions, setSuggestions] = useState<Array<{ name: string; symbol: string }>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
   const [watchlist, setWatchlist] = useState<WatchlistData[]>(
@@ -246,24 +246,53 @@ export default function DataPanel() {
     window.dispatchEvent(new CustomEvent("trade-complete-message", { detail: { message } }));
   }, []);
 
-  // 입력값에 따라 자동완성 후보 계산
+  // 검색 API 디바운스 타이머
+  const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 입력값에 따라 자동완성 (API 호출 + 로컬 DB 병합)
   const handleInputChange = (value: string) => {
     setSymbolInput(value);
-    const q = value.trim().toLowerCase();
+    const q = value.trim();
     if (q.length === 0) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
-    const matched = STOCK_SEARCH_DB.filter(
+
+    // 즉시 로컬 DB에서 검색 (빠른 응답)
+    const localMatched = STOCK_SEARCH_DB.filter(
       (item) =>
-        item.name.toLowerCase().includes(q) ||
-        item.symbol.toLowerCase().includes(q) ||
-        item.keywords.some((kw) => kw.includes(q))
-    ).slice(0, 8);
-    setSuggestions(matched);
-    setShowSuggestions(matched.length > 0);
+        item.name.toLowerCase().includes(q.toLowerCase()) ||
+        item.symbol.toLowerCase().includes(q.toLowerCase()) ||
+        item.keywords.some((kw) => kw.includes(q.toLowerCase()))
+    ).slice(0, 5);
+    setSuggestions(localMatched);
+    setShowSuggestions(localMatched.length > 0);
     setSelectedIdx(-1);
+
+    // API 검색 (디바운스 300ms)
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/stock/search?q=${encodeURIComponent(q)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const apiResults: Array<{ name: string; symbol: string }> = (data.results || []).map(
+          (r: { name: string; symbol: string }) => ({ name: r.name, symbol: r.symbol })
+        );
+        // 로컬 + API 결과 병합 (중복 제거)
+        const merged: Array<{ name: string; symbol: string }> = [...localMatched];
+        const existingSymbols = new Set(merged.map((m) => m.symbol));
+        for (const item of apiResults) {
+          if (!existingSymbols.has(item.symbol)) {
+            merged.push(item);
+            existingSymbols.add(item.symbol);
+          }
+        }
+        setSuggestions(merged.slice(0, 12));
+        setShowSuggestions(merged.length > 0);
+      } catch { /* silent */ }
+    }, 300);
   };
 
   const handleSelectSuggestion = (symbol: string) => {
@@ -278,7 +307,7 @@ export default function DataPanel() {
     const q = symbolInput.trim();
     if (!q) return;
 
-    // 한글이면 매핑에서 찾기
+    // 로컬 DB에서 정확히 매칭
     const exact = STOCK_SEARCH_DB.find(
       (item) =>
         item.name.toLowerCase() === q.toLowerCase() ||
@@ -286,7 +315,11 @@ export default function DataPanel() {
     );
     if (exact) {
       setChartSymbol(exact.symbol);
+    } else if (/^\d{6}$/.test(q)) {
+      // 6자리 숫자 → 한국 종목코드 (자동으로 .KS 추가)
+      setChartSymbol(`${q}.KS`);
     } else {
+      // 그 외: 직접 심볼로 사용 (AAPL, TSLA, SPY 등)
       setChartSymbol(q.toUpperCase());
     }
     setSymbolInput("");
