@@ -18,7 +18,6 @@ import {
 import {
   OHLCV,
   calcSMA,
-  calcEMA,
   calcCCI,
   calcRSI,
   calcMACD,
@@ -124,6 +123,7 @@ const TICKER_TO_KOREAN_NAME: Record<string, string> = {
 };
 
 // ─── 캔들스틱 커스텀 Shape ─────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
 function CandleShape(props: any) {
   const { x, y, width, height, payload } = props;
   if (!payload) return null;
@@ -314,6 +314,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   // 타임프레임 변경 시 줌 리셋 (기본 뷰: 최근 1/3)
   useEffect(() => {
     setZoomRange(DEFAULT_ZOOM);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeframe]);
 
   // 마우스 휠 줌 핸들러 — document 레벨 캡처로 ScrollArea보다 먼저 잡음

@@ -149,7 +149,6 @@ export function calcMACD(
   }
 
   // Signal line = EMA of MACD
-  const validMacd = macdLine.filter((v) => v !== null) as number[];
   const signalLine: (number | null)[] = [];
   const multiplier = 2 / (signalPeriod + 1);
 

@@ -20,12 +20,12 @@ async function searchYahoo(query: string): Promise<SearchResult[]> {
   const data = await res.json();
 
   return (data.quotes || [])
-    .filter((q: any) => q.isYahooFinance !== false)
-    .map((q: any) => ({
-      symbol: q.symbol,
-      name: q.shortname || q.longname || q.symbol,
-      type: q.quoteType || "EQUITY",
-      exchange: q.exchDisp || q.exchange || "",
+    .filter((q: Record<string, unknown>) => q.isYahooFinance !== false)
+    .map((q: Record<string, unknown>) => ({
+      symbol: q.symbol as string,
+      name: (q.shortname || q.longname || q.symbol) as string,
+      type: (q.quoteType || "EQUITY") as string,
+      exchange: (q.exchDisp || q.exchange || "") as string,
     }));
 }
 
