@@ -5,24 +5,24 @@
 @layer base {
   /* Alpha-Vibe: 주식 터미널 다크 테마 — 항상 dark */
   :root {
-    --background: 220 20% 4%;         /* #0a0e14 깊은 네이비 블랙 */
-    --foreground: 210 20% 88%;        /* #d4dae4 밝은 쿨 그레이 */
-    --card: 220 18% 7%;               /* #101520 카드 배경 */
-    --card-foreground: 210 20% 88%;
-    --popover: 220 18% 7%;
-    --popover-foreground: 210 20% 88%;
+    --background: 220 16% 8%;         /* 깊은 네이비 (밝기 향상) */
+    --foreground: 210 20% 92%;        /* 밝은 쿨 그레이 (가독성 향상) */
+    --card: 220 15% 11%;              /* 카드 배경 (밝기 향상) */
+    --card-foreground: 210 20% 92%;
+    --popover: 220 15% 11%;
+    --popover-foreground: 210 20% 92%;
     --primary: 142 72% 50%;           /* #22c55e 메인 그린 (상승/양봉) */
-    --primary-foreground: 220 20% 4%;
-    --secondary: 220 14% 11%;         /* 서브 패널 배경 (더 어둡게) */
+    --primary-foreground: 220 16% 8%;
+    --secondary: 220 12% 15%;         /* 서브 패널 배경 (밝기 향상) */
     --secondary-foreground: 210 20% 78%;
-    --muted: 220 14% 12%;
-    --muted-foreground: 215 15% 50%;
+    --muted: 220 12% 16%;
+    --muted-foreground: 215 15% 58%;
     --accent: 199 89% 48%;            /* #0ea5e9 하이라이트 블루 */
     --accent-foreground: 0 0% 98%;
     --destructive: 0 72% 56%;         /* #ef4444 하락/음봉 레드 */
     --destructive-foreground: 0 0% 98%;
-    --border: 220 14% 14%;            /* 보더 라인 (더 미묘하게) */
-    --input: 220 14% 14%;
+    --border: 220 12% 20%;            /* 보더 라인 (대비 향상) */
+    --input: 220 12% 20%;
     --ring: 142 72% 50%;              /* 포커스 링도 그린 */
     --chart-1: 142 72% 50%;           /* 그린 */
     --chart-2: 0 72% 56%;             /* 레드 */
@@ -30,6 +30,7 @@
     --chart-4: 45 93% 58%;            /* 앰버 */
     --chart-5: 270 70% 60%;           /* 퍼플 */
     --radius: 0.5rem;
+    --font-scale: 1;
   }
 }
 
@@ -39,6 +40,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: calc(14px * var(--font-scale));
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -53,11 +55,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(220 14% 18%);
+    background: hsl(220 12% 24%);
     border-radius: 2px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(220 14% 26%);
+    background: hsl(220 12% 32%);
   }
 
   /* 선택 색상 */
@@ -104,6 +106,12 @@
                 0 4px 16px hsl(220 20% 4% / 0.5);
   }
 }
+
+/* Theme font size variants */
+.font-scale-sm { --font-scale: 0.9; }
+.font-scale-md { --font-scale: 1; }
+.font-scale-lg { --font-scale: 1.1; }
+.font-scale-xl { --font-scale: 1.2; }
 
 /* Recharts 차트 커스텀 */
 .recharts-cartesian-grid-horizontal line,
