@@ -218,8 +218,8 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
 
   // SMA200용 일봉 데이터 (분봉 차트에서 진짜 200일선을 그리기 위함)
   const [dailySma200, setDailySma200] = useState<Map<string, number>>(new Map());
-  const isIntradayTimeframe = ["1m", "30m", "60m", "1D", "1W"].includes(timeframe);
-  const needsDailySma200 = indicators.sma200 && (isIntradayTimeframe || timeframe === "1M");
+  // 모든 타임프레임에서 일봉 기반 SMA200 사용 (차트 데이터의 calcSMA는 분/주/월봉 평균이라 200일선이 아님)
+  const needsDailySma200 = indicators.sma200;
 
   // SMA200용 일봉 데이터 별도 fetch (분봉/1M에서 200일선 계산)
   useEffect(() => {
@@ -606,6 +606,9 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   }
 
   // ─── 차트 범위 (가시 데이터 기준) ──────────────────────
+  // Y축 domain은 순수 가격(high/low)과 볼린저밴드만으로 결정
+  // SMA 라인은 Y축에 포함하지 않음 → 차트 뭉개짐 완전 방지
+  // SMA가 범위 밖이면 자연스럽게 클리핑됨
   const allPrices = visibleData.flatMap((d) => [d.high, d.low]);
   if (indicators.bb) {
     visibleData.forEach((d) => {
@@ -613,20 +616,9 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
       if (d.bbLower != null) allPrices.push(d.bbLower);
     });
   }
-  // SMA 라인: Y축 범위를 적당히 확장 (가격 범위의 ±40% 이내만 포함 → 차트 뭉개짐 방지)
-  const basePriceMin = Math.min(...allPrices);
-  const basePriceMax = Math.max(...allPrices);
-  const priceRange = basePriceMax - basePriceMin || 1;
-  const smaClampMin = basePriceMin - priceRange * 0.4;
-  const smaClampMax = basePriceMax + priceRange * 0.4;
-  visibleData.forEach((d) => {
-    if (indicators.sma20 && d.sma20 != null && d.sma20 >= smaClampMin && d.sma20 <= smaClampMax) allPrices.push(d.sma20);
-    if (indicators.sma50 && d.sma50 != null && d.sma50 >= smaClampMin && d.sma50 <= smaClampMax) allPrices.push(d.sma50);
-    if (indicators.sma200 && d.sma200 != null && d.sma200 >= smaClampMin && d.sma200 <= smaClampMax) allPrices.push(d.sma200);
-  });
   const minPrice = Math.min(...allPrices);
   const maxPrice = Math.max(...allPrices);
-  const pricePadding = (maxPrice - minPrice) * 0.05 || 1;
+  const pricePadding = (maxPrice - minPrice) * 0.08 || 1;
 
   // compact 모드: 간단한 라인 차트만
   if (compact) {
