@@ -169,6 +169,7 @@ export default function StockInfoPanel({ symbol }: StockInfoPanelProps) {
 
     return (
       <div className="space-y-1.5">
+        <div className="text-[10px] font-mono text-yellow-500/70 px-1 mb-1">※ 전일 기준 (장중에는 전일 마감 데이터)</div>
         <div className="grid grid-cols-3 text-[11px] font-mono text-slate-400 px-1">
           <span></span><span className="text-right">순매수(주)</span><span className="text-right">방향</span>
         </div>
