@@ -548,6 +548,42 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   const fmtAxisPrice = (v: number) =>
     v >= 1000000 ? `${(v / 10000).toFixed(0)}만` : v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(1);
 
+  // ─── 서브 지표 높이 (유저 조절 가능) ──────────────────────
+  const [subHeights, setSubHeights] = useState<Record<SubIndicator, number>>({
+    volume: 90, cci: 90, rsi: 90, macd: 90,
+  });
+  const subResizingRef = useRef<{ key: SubIndicator; startY: number; startH: number } | null>(null);
+
+  useEffect(() => {
+    const handleResizeMove = (e: MouseEvent) => {
+      if (!subResizingRef.current) return;
+      e.preventDefault();
+      const delta = e.clientY - subResizingRef.current.startY;
+      const newH = Math.max(50, Math.min(300, subResizingRef.current.startH + delta));
+      setSubHeights((prev) => ({ ...prev, [subResizingRef.current!.key]: newH }));
+    };
+    const handleResizeUp = () => { subResizingRef.current = null; };
+    document.addEventListener("mousemove", handleResizeMove);
+    document.addEventListener("mouseup", handleResizeUp);
+    return () => {
+      document.removeEventListener("mousemove", handleResizeMove);
+      document.removeEventListener("mouseup", handleResizeUp);
+    };
+  }, []);
+
+  const renderResizeHandle = (key: SubIndicator) => (
+    <div
+      className="h-1.5 cursor-ns-resize group flex items-center justify-center hover:bg-primary/10 rounded transition-colors"
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        subResizingRef.current = { key, startY: e.clientY, startH: subHeights[key] };
+      }}
+    >
+      <div className="w-8 h-0.5 bg-slate-600 group-hover:bg-primary/50 rounded-full transition-colors" />
+    </div>
+  );
+
   // ─── 로딩/에러 ──────────────────────────────────────
   if (loading) {
     return (
@@ -563,7 +599,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
 
   if (error || chartData.length === 0) {
     return (
-      <div className={`flex items-center justify-center ${compact ? "h-[100px]" : "h-[400px]"} text-xs font-mono text-muted-foreground/70`}>
+      <div className={`flex items-center justify-center ${compact ? "h-[100px]" : "h-[400px]"} text-xs font-mono text-slate-300`}>
         {error || "데이터 없음"}
       </div>
     );
@@ -577,11 +613,16 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
       if (d.bbLower != null) allPrices.push(d.bbLower);
     });
   }
-  // SMA 라인이 Y축 범위에 포함되도록 (SMA200이 현재 가격과 멀면 차트가 찌그러지는 버그 수정)
+  // SMA 라인: Y축 범위를 적당히 확장 (가격 범위의 ±40% 이내만 포함 → 차트 뭉개짐 방지)
+  const basePriceMin = Math.min(...allPrices);
+  const basePriceMax = Math.max(...allPrices);
+  const priceRange = basePriceMax - basePriceMin || 1;
+  const smaClampMin = basePriceMin - priceRange * 0.4;
+  const smaClampMax = basePriceMax + priceRange * 0.4;
   visibleData.forEach((d) => {
-    if (indicators.sma20 && d.sma20 != null) allPrices.push(d.sma20);
-    if (indicators.sma50 && d.sma50 != null) allPrices.push(d.sma50);
-    if (indicators.sma200 && d.sma200 != null) allPrices.push(d.sma200);
+    if (indicators.sma20 && d.sma20 != null && d.sma20 >= smaClampMin && d.sma20 <= smaClampMax) allPrices.push(d.sma20);
+    if (indicators.sma50 && d.sma50 != null && d.sma50 >= smaClampMin && d.sma50 <= smaClampMax) allPrices.push(d.sma50);
+    if (indicators.sma200 && d.sma200 != null && d.sma200 >= smaClampMin && d.sma200 <= smaClampMax) allPrices.push(d.sma200);
   });
   const minPrice = Math.min(...allPrices);
   const maxPrice = Math.max(...allPrices);
@@ -607,17 +648,14 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
     );
   }
 
-  // ─── 개별 서브 지표 렌더 함수 ──────────────────────────
-  const subHeight = 90;
-
   const renderVolume = () => {
     const maxVol = Math.max(...visibleData.map((d) => d.volume));
     return (
       <div key="sub-volume">
-        <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground/60 mb-0.5">
+        <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400 mb-0.5">
           <span>거래량</span>
         </div>
-        <ResponsiveContainer width="100%" height={subHeight}>
+        <ResponsiveContainer width="100%" height={subHeights.volume}>
           <BarChart data={visibleData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <XAxis dataKey="date" hide />
             <YAxis
@@ -635,17 +673,18 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+        {renderResizeHandle("volume")}
       </div>
     );
   };
 
   const renderCCI = () => (
     <div key="sub-cci">
-      <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground/60 mb-0.5">
+      <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400 mb-0.5">
         <span className="text-cyan-400">CCI</span>
-        <span className="text-muted-foreground/60">(-100/+100 기준선)</span>
+        <span className="text-slate-400">(-100/+100 기준선)</span>
       </div>
-      <ResponsiveContainer width="100%" height={subHeight}>
+      <ResponsiveContainer width="100%" height={subHeights.cci}>
         <ComposedChart data={visibleData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <XAxis dataKey="date" hide />
           <YAxis
@@ -663,16 +702,17 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
           <Line type="monotone" dataKey="cci" stroke="#06b6d4" strokeWidth={1.5} dot={false} connectNulls />
         </ComposedChart>
       </ResponsiveContainer>
+      {renderResizeHandle("cci")}
     </div>
   );
 
   const renderRSI = () => (
     <div key="sub-rsi">
-      <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground/60 mb-0.5">
+      <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400 mb-0.5">
         <span className="text-pink-400">RSI</span>
-        <span className="text-muted-foreground/60">(30 과매도 / 70 과매수)</span>
+        <span className="text-slate-400">(30 과매도 / 70 과매수)</span>
       </div>
-      <ResponsiveContainer width="100%" height={subHeight}>
+      <ResponsiveContainer width="100%" height={subHeights.rsi}>
         <ComposedChart data={visibleData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <XAxis dataKey="date" hide />
           <YAxis
@@ -689,15 +729,16 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
           <Line type="monotone" dataKey="rsi" stroke="#ec4899" strokeWidth={1.5} dot={false} connectNulls />
         </ComposedChart>
       </ResponsiveContainer>
+      {renderResizeHandle("rsi")}
     </div>
   );
 
   const renderMACD = () => (
     <div key="sub-macd">
-      <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground/60 mb-0.5">
+      <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400 mb-0.5">
         <span className="text-blue-400">MACD</span>
       </div>
-      <ResponsiveContainer width="100%" height={subHeight}>
+      <ResponsiveContainer width="100%" height={subHeights.macd}>
         <ComposedChart data={visibleData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <XAxis dataKey="date" hide />
           <YAxis
@@ -717,6 +758,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
           <Line type="monotone" dataKey="macdSignal" stroke="#f97316" strokeWidth={1} dot={false} connectNulls />
         </ComposedChart>
       </ResponsiveContainer>
+      {renderResizeHandle("macd")}
     </div>
   );
 
@@ -772,34 +814,35 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
         </div>
       </div>
 
-      {/* 타임프레임 + 차트타입 + 설정 버튼 */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-0.5">
+      {/* 타임프레임 + 차트타입 + 설정 버튼 — 가로 한 줄 */}
+      <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+        <div className="flex gap-0.5 shrink-0">
           {TIMEFRAMES.map((tf) => (
             <button
               key={tf.key}
               onClick={() => setTimeframe(tf.key)}
-              className={`px-1.5 py-0.5 text-[11px] font-mono rounded transition-colors ${
+              className={`px-1.5 py-0.5 text-[11px] font-mono rounded transition-colors whitespace-nowrap ${
                 timeframe === tf.key
                   ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  : "text-slate-400 hover:text-foreground hover:bg-secondary"
               }`}
             >
               {tf.label}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="w-px h-4 bg-border/50 shrink-0" />
+        <div className="flex items-center gap-0.5 shrink-0">
           <button
             onClick={() => setChartType(chartType === "candle" ? "line" : "candle")}
-            className="px-1.5 py-0.5 text-[11px] font-mono rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="px-1.5 py-0.5 text-[11px] font-mono rounded text-slate-400 hover:text-foreground hover:bg-secondary transition-colors whitespace-nowrap"
           >
-            {chartType === "candle" ? "📊캔들" : "📈라인"}
+            {chartType === "candle" ? "캔들" : "라인"}
           </button>
           <button
             onClick={() => setShowSettings(!showSettings)}
             className={`px-1.5 py-0.5 text-[11px] font-mono rounded transition-colors ${
-              showSettings ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+              showSettings ? "bg-secondary text-foreground" : "text-slate-400 hover:text-foreground hover:bg-secondary"
             }`}
           >
             ⚙
@@ -827,7 +870,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
                 className={`px-1.5 py-0.5 text-[11px] font-mono rounded border transition-colors ${
                   indicators[ind.key]
                     ? ind.color
-                    : "border-border text-muted-foreground/70 hover:text-muted-foreground"
+                    : "border-border text-slate-300 hover:text-muted-foreground"
                 }`}
               >
                 {ind.label}
@@ -851,7 +894,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
                 className={`px-1.5 py-0.5 text-[11px] font-mono rounded border transition-colors ${
                   subIndicators.has(si.key)
                     ? "bg-primary/20 text-primary border-primary/30"
-                    : "border-border text-muted-foreground/70 hover:text-muted-foreground"
+                    : "border-border text-slate-300 hover:text-muted-foreground"
                 }`}
               >
                 {si.label}
@@ -871,8 +914,8 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
       </div>
 
       {/* 줌 컨트롤 */}
-      <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground/70">
-        <span className="text-muted-foreground/60">스크롤=줌 | 드래그=이동</span>
+      <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+        <span className="text-cyan-700">스크롤=줌 | 드래그=이동</span>
         <div className="flex items-center gap-1">
           <button
             onClick={handleZoomIn}
@@ -890,7 +933,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
           </button>
           {isZoomed && (
             <>
-              <span className="text-muted-foreground/65 mx-0.5">{Math.round((zoomRange[1] - zoomRange[0]) * 100)}%</span>
+              <span className="text-slate-400 mx-0.5">{Math.round((zoomRange[1] - zoomRange[0]) * 100)}%</span>
               <button
                 onClick={() => setZoomRange(DEFAULT_ZOOM)}
                 className="px-1 py-0.5 rounded bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"

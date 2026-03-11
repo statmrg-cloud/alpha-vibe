@@ -205,7 +205,7 @@ export default function ChatPanel() {
           </span>
         </div>
         <div className="w-px h-3.5 bg-border/30 mx-3" />
-        <span className="text-[11px] font-mono text-muted-foreground/70 tracking-wide">
+        <span className="text-[11px] font-mono text-slate-300 tracking-wide">
           Claude Sonnet 4 | Hedge Fund Strategist
         </span>
         <div className="ml-auto flex gap-1.5">
@@ -242,7 +242,7 @@ export default function ChatPanel() {
                       </div>
                     )}
                     <p className="whitespace-pre-wrap font-mono text-xs leading-relaxed">{msg.content}</p>
-                    <span className="text-[11px] text-muted-foreground/65 mt-1.5 block font-mono" suppressHydrationWarning>
+                    <span className="text-[11px] text-slate-400 mt-1.5 block font-mono" suppressHydrationWarning>
                       {new Date(msg.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
                     </span>
 
@@ -251,7 +251,7 @@ export default function ChatPanel() {
                       <div className="mt-3 pt-2.5 border-t border-border/50 space-y-3">
                         {/* 모의 투자 */}
                         <div className="space-y-1.5">
-                          <span className="text-[11px] font-mono text-muted-foreground/60 block tracking-wider">
+                          <span className="text-[11px] font-mono text-slate-400 block tracking-wider">
                             PAPER TRADE (모의투자)
                           </span>
                           {msg.symbols.map((sym) => {
@@ -363,7 +363,7 @@ export default function ChatPanel() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="종목, 시장 분석, 투자 전략을 질문하세요..."
-              className="pl-7 bg-secondary/60 border-border/50 text-foreground font-mono text-xs h-9 placeholder:text-muted-foreground/60 focus-visible:ring-primary/20 focus-visible:border-primary/30 transition-colors"
+              className="pl-7 bg-secondary/60 border-border/50 text-foreground font-mono text-xs h-9 placeholder:text-slate-400 focus-visible:ring-primary/20 focus-visible:border-primary/30 transition-colors"
               disabled={isLoading}
             />
           </div>
@@ -381,7 +381,7 @@ export default function ChatPanel() {
             <button
               key={q}
               onClick={() => setInput(q)}
-              className="text-[11px] font-mono px-2.5 py-1 rounded-md border border-border/40 text-muted-foreground/70 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-all"
+              className="text-[11px] font-mono px-2.5 py-1 rounded-md border border-border/40 text-slate-300 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-all"
               disabled={isLoading}
             >
               {q}

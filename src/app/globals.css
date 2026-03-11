@@ -101,6 +101,14 @@
   .card-hover {
     @apply transition-all duration-200;
   }
+  /* 스크롤바 숨기기 */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
   .card-hover:hover {
     box-shadow: 0 0 0 1px hsl(220 14% 20%),
                 0 4px 16px hsl(220 20% 4% / 0.5);

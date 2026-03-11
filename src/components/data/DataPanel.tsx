@@ -433,11 +433,11 @@ export default function DataPanel() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <div className="w-1 h-3 rounded-full bg-primary" />
-                <span className="text-xs font-mono text-muted-foreground tracking-wider">
+                <span className="text-xs font-mono text-cyan-500 tracking-wider">
                   PRICE CHART
                 </span>
               </div>
-              <span className="text-[11px] font-mono text-muted-foreground/70">7D</span>
+              <span className="text-[11px] font-mono text-slate-300">7D</span>
             </div>
             {/* 종목 검색 + 자동완성 */}
             <div className="relative mb-2">
@@ -472,7 +472,7 @@ export default function DataPanel() {
                   onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
                   onBlur={() => setTimeout(() => { setShowSuggestions(false); setSelectedIdx(-1); }, 200)}
                   placeholder="종목 검색 (삼성, GOOG, 카카오...)"
-                  className="flex-1 h-7 text-xs font-mono bg-secondary/60 border border-border/50 rounded px-2 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/40"
+                  className="flex-1 h-7 text-xs font-mono bg-secondary/60 border border-border/50 rounded px-2 text-foreground placeholder:text-slate-400 focus:outline-none focus:border-primary/40"
                 />
                 <button
                   onClick={handleSymbolSearch}
@@ -503,7 +503,7 @@ export default function DataPanel() {
                           {item.name}
                         </span>
                       </div>
-                      <span className={`text-[11px] font-mono ${idx === selectedIdx ? "text-primary/70" : "text-muted-foreground/60"}`}>
+                      <span className={`text-[11px] font-mono ${idx === selectedIdx ? "text-primary/70" : "text-slate-400"}`}>
                         {item.symbol}
                       </span>
                     </button>
@@ -520,7 +520,7 @@ export default function DataPanel() {
                   className={`text-[11px] font-mono px-2.5 py-1 rounded transition-all ${
                     chartSymbol === sym
                       ? "bg-primary/20 text-primary border border-primary/30"
-                      : "text-muted-foreground/60 border border-transparent hover:text-muted-foreground hover:border-border"
+                      : "text-slate-400 border border-transparent hover:text-muted-foreground hover:border-border"
                   }`}
                 >
                   {getDisplayLabel(sym)}
@@ -537,7 +537,7 @@ export default function DataPanel() {
                       className={`text-[11px] font-mono px-2.5 py-1 rounded transition-all ${
                         chartSymbol === h.symbol
                           ? "bg-primary/20 text-primary border border-primary/30"
-                          : "text-muted-foreground/60 border border-transparent hover:text-muted-foreground hover:border-border"
+                          : "text-slate-400 border border-transparent hover:text-muted-foreground hover:border-border"
                       }`}
                     >
                       {getDisplayLabel(h.symbol)}
@@ -603,10 +603,10 @@ export default function DataPanel() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <div className="w-1 h-3 rounded-full bg-chart-4" />
-                <span className="text-xs font-mono text-muted-foreground tracking-wider">
+                <span className="text-xs font-mono text-cyan-500 tracking-wider">
                   PORTFOLIO
                 </span>
-                <span className="text-[10px] font-mono text-muted-foreground/70 px-1 py-0.5 rounded border border-border/40">
+                <span className="text-[10px] font-mono text-slate-300 px-1 py-0.5 rounded border border-border/40">
                   KR / US
                 </span>
               </div>
@@ -619,14 +619,14 @@ export default function DataPanel() {
                 </Badge>
                 <button
                   onClick={() => setShowSettings(!showSettings)}
-                  className="text-[11px] font-mono text-muted-foreground/65 hover:text-foreground transition-colors"
+                  className="text-[11px] font-mono text-slate-400 hover:text-foreground transition-colors"
                   title="설정"
                 >
                   ⚙
                 </button>
                 <button
                   onClick={resetPortfolio}
-                  className="text-[11px] font-mono text-muted-foreground/65 hover:text-destructive transition-colors"
+                  className="text-[11px] font-mono text-slate-400 hover:text-destructive transition-colors"
                   title="포트폴리오 초기화"
                 >
                   RESET
@@ -663,9 +663,9 @@ export default function DataPanel() {
                         {investPnl >= 0 ? "+" : ""}{investPnlPct.toFixed(2)}%
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-1 text-[11px] font-mono text-muted-foreground/70">
+                    <div className="flex items-center gap-2 mt-1 text-[11px] font-mono text-slate-300">
                       <span>원금 {Math.round(totalInvested).toLocaleString()}</span>
-                      <span className="text-muted-foreground/60">|</span>
+                      <span className="text-slate-400">|</span>
                       <span>평가 {Math.round(totalMarketValue).toLocaleString()}</span>
                     </div>
                   </div>
@@ -675,19 +675,19 @@ export default function DataPanel() {
               <Separator className="my-2 bg-border/50" />
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-mono">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground/70">보유 현금</span>
+                  <span className="text-slate-300">보유 현금</span>
                   <span className="text-foreground">{Math.round(portfolio.cash).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground/70">평가액</span>
+                  <span className="text-slate-300">평가액</span>
                   <span className="text-foreground">{Math.round(totalMarketValue).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground/70">종목 수</span>
+                  <span className="text-slate-300">종목 수</span>
                   <span className="text-foreground">{portfolio.holdings.length}종목</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground/70">총 거래</span>
+                  <span className="text-slate-300">총 거래</span>
                   <span className="text-foreground">{portfolio.trades.length}건</span>
                 </div>
               </div>
@@ -705,7 +705,7 @@ export default function DataPanel() {
             <div className="px-3 py-2.5">
               <div className="flex items-center gap-1.5 mb-3">
                 <div className="w-1 h-3 rounded-full bg-muted-foreground" />
-                <span className="text-xs font-mono text-muted-foreground tracking-wider">
+                <span className="text-xs font-mono text-cyan-500 tracking-wider">
                   SETTINGS
                 </span>
               </div>
@@ -739,7 +739,7 @@ export default function DataPanel() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-xs font-mono text-foreground">Alpaca 실거래 계좌</div>
-                    <div className="text-[11px] font-mono text-muted-foreground/70">Paper Trading API 연동</div>
+                    <div className="text-[11px] font-mono text-slate-300">Paper Trading API 연동</div>
                   </div>
                   <button
                     onClick={() => toggleAlpaca(!showAlpaca)}
@@ -773,11 +773,11 @@ export default function DataPanel() {
           <div className="px-3 pt-3 pb-1">
             <div className="flex items-center gap-1.5 mb-2">
               <div className="w-1 h-3 rounded-full bg-primary" />
-              <span className="text-xs font-mono text-muted-foreground tracking-wider">
+              <span className="text-xs font-mono text-cyan-500 tracking-wider">
                 HOLDINGS
               </span>
               {portfolio.holdings.length > 0 && (
-                <span className="text-[11px] font-mono text-muted-foreground/65 ml-auto">
+                <span className="text-[11px] font-mono text-slate-400 ml-auto">
                   {portfolio.holdings.length}종목
                 </span>
               )}
@@ -785,7 +785,7 @@ export default function DataPanel() {
           </div>
           <div className="px-3 pb-3">
             {portfolio.holdings.length === 0 ? (
-              <div className="text-xs font-mono text-muted-foreground/65 py-3 text-center border border-dashed border-border/50 rounded">
+              <div className="text-xs font-mono text-slate-400 py-3 text-center border border-dashed border-border/50 rounded">
                 보유 종목 없음 — 차트에서 매수하거나 AI 분석 후 매수해보세요
               </div>
             ) : (
@@ -818,7 +818,7 @@ export default function DataPanel() {
                               {isKr ? formatPrice(h.symbol, rawPrice) : `$${rawPrice.toFixed(2)}`}
                             </div>
                             {!isKr && (
-                              <div className="text-[11px] text-muted-foreground/70">
+                              <div className="text-[11px] text-slate-300">
                                 ≈{Math.round(krwCurPrice).toLocaleString()}원
                               </div>
                             )}
@@ -828,7 +828,7 @@ export default function DataPanel() {
                           </>
                         );
                       })() : (
-                        <div className="text-xs text-muted-foreground/60">
+                        <div className="text-xs text-slate-400">
                           avg {h.avgPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}원
                         </div>
                       )}
@@ -846,11 +846,11 @@ export default function DataPanel() {
           <div className="px-3 pt-3 pb-1">
             <div className="flex items-center gap-1.5 mb-2">
               <div className="w-1 h-3 rounded-full bg-accent" />
-              <span className="text-xs font-mono text-muted-foreground tracking-wider">
+              <span className="text-xs font-mono text-cyan-500 tracking-wider">
                 TRADE HISTORY
               </span>
               {portfolio.trades.length > 0 && (
-                <span className="text-[11px] font-mono text-muted-foreground/65 ml-auto">
+                <span className="text-[11px] font-mono text-slate-400 ml-auto">
                   {portfolio.trades.length}건
                 </span>
               )}
@@ -858,7 +858,7 @@ export default function DataPanel() {
           </div>
           <div className="px-3 pb-3">
             {portfolio.trades.length === 0 ? (
-              <div className="text-xs font-mono text-muted-foreground/65 py-3 text-center border border-dashed border-border/50 rounded">
+              <div className="text-xs font-mono text-slate-400 py-3 text-center border border-dashed border-border/50 rounded">
                 거래 내역 없음
               </div>
             ) : (
@@ -898,13 +898,13 @@ export default function DataPanel() {
                         );
                       })()}
                     </div>
-                    <span className="text-muted-foreground/70 text-[10px] shrink-0">
+                    <span className="text-slate-300 text-[10px] shrink-0">
                       {Math.round(t.total).toLocaleString()}
                     </span>
                   </div>
                 ))}
                 {portfolio.trades.length > 8 && (
-                  <div className="text-[11px] font-mono text-muted-foreground/60 text-center pt-1">
+                  <div className="text-[11px] font-mono text-slate-400 text-center pt-1">
                     +{portfolio.trades.length - 8}건 더
                   </div>
                 )}
@@ -925,10 +925,10 @@ export default function DataPanel() {
           <div className="px-3 pt-3 pb-1">
             <div className="flex items-center gap-1.5 mb-2">
               <div className="w-1 h-3 rounded-full bg-chart-4" />
-              <span className="text-xs font-mono text-muted-foreground tracking-wider">
+              <span className="text-xs font-mono text-cyan-500 tracking-wider">
                 WATCHLIST
               </span>
-              <span className="text-[10px] font-mono text-muted-foreground/60 ml-auto">LIVE</span>
+              <span className="text-[10px] font-mono text-slate-400 ml-auto">LIVE</span>
             </div>
           </div>
           <div className="px-3 pb-3">
@@ -950,7 +950,7 @@ export default function DataPanel() {
                   </div>
                   <div className="text-right font-mono">
                     {stock.loading ? (
-                      <div className="text-xs text-muted-foreground/60 animate-pulse">로딩...</div>
+                      <div className="text-xs text-slate-400 animate-pulse">로딩...</div>
                     ) : (
                       <>
                         <div className="text-xs text-foreground">

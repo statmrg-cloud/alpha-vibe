@@ -91,7 +91,7 @@ export default function Header() {
             key={idx.name}
             className="flex items-center gap-1.5 whitespace-nowrap group cursor-default"
           >
-            <span className="text-muted-foreground/60 text-[10px]">{idx.name}</span>
+            <span className="text-slate-400 text-[10px]">{idx.name}</span>
             <span className="text-foreground/90 text-[11px] font-medium">
               {idx.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
             </span>
@@ -108,7 +108,7 @@ export default function Header() {
       </div>
 
       {/* 우측 상태 */}
-      <div className="flex items-center gap-3 text-[10px] text-muted-foreground/60 shrink-0">
+      <div className="flex items-center gap-3 text-[10px] text-slate-400 shrink-0">
         <span className="font-mono tabular-nums" suppressHydrationWarning>{time}</span>
         <div className="w-px h-3.5 bg-border/40" />
         <div className="flex items-center gap-1">

@@ -83,7 +83,7 @@ export default function AlpacaAccountPanel() {
   // 로딩
   if (loading) {
     return (
-      <div className="p-3 text-center text-muted-foreground/70 font-mono text-xs animate-pulse">
+      <div className="p-3 text-center text-slate-300 font-mono text-xs animate-pulse">
         Alpaca 계좌 조회 중...
       </div>
     );
@@ -95,11 +95,11 @@ export default function AlpacaAccountPanel() {
       <div className="p-3 space-y-2">
         <div className="flex items-center gap-1.5">
           <div className="w-1 h-3 rounded-full bg-chart-4" />
-          <span className="text-[10px] font-mono text-muted-foreground tracking-wider">
+          <span className="text-[10px] font-mono text-cyan-500 tracking-wider">
             ALPACA ACCOUNT
           </span>
         </div>
-        <div className="text-[10px] font-mono text-muted-foreground/65 py-3 text-center border border-dashed border-border/50 rounded">
+        <div className="text-[10px] font-mono text-slate-400 py-3 text-center border border-dashed border-border/50 rounded">
           {error || "Alpaca API 키를 .env.local에 설정하세요"}
         </div>
       </div>
@@ -116,7 +116,7 @@ export default function AlpacaAccountPanel() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <div className="w-1 h-3 rounded-full bg-chart-4" />
-          <span className="text-[10px] font-mono text-muted-foreground tracking-wider">
+          <span className="text-[10px] font-mono text-cyan-500 tracking-wider">
             ALPACA ACCOUNT
           </span>
         </div>
@@ -131,7 +131,7 @@ export default function AlpacaAccountPanel() {
           )}
           <button
             onClick={() => { setLoading(true); fetchData(); }}
-            className="text-[11px] font-mono text-muted-foreground/65 hover:text-primary transition-colors"
+            className="text-[11px] font-mono text-slate-400 hover:text-primary transition-colors"
             title="새로고침"
           >
             REFRESH
@@ -155,25 +155,25 @@ export default function AlpacaAccountPanel() {
       {/* 상세 지표 */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] font-mono">
         <div className="flex justify-between">
-          <span className="text-muted-foreground/70">현금 잔고</span>
+          <span className="text-slate-300">현금 잔고</span>
           <span className="text-foreground">
             ${account.cash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground/70">매수 여력</span>
+          <span className="text-slate-300">매수 여력</span>
           <span className="text-foreground">
             ${account.buyingPower.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground/70">포지션 가치</span>
+          <span className="text-slate-300">포지션 가치</span>
           <span className="text-foreground">
             ${account.longMarketValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground/70">미실현 손익</span>
+          <span className="text-slate-300">미실현 손익</span>
           <span className={totalPositionsPl >= 0 ? "text-up" : "text-down"}>
             {totalPositionsPl >= 0 ? "+" : ""}${totalPositionsPl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
@@ -185,10 +185,10 @@ export default function AlpacaAccountPanel() {
         <>
           <Separator className="bg-border/50" />
           <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-[10px] font-mono text-muted-foreground tracking-wider">
+            <span className="text-[10px] font-mono text-cyan-500 tracking-wider">
               POSITIONS
             </span>
-            <span className="text-[11px] font-mono text-muted-foreground/65 ml-auto">
+            <span className="text-[11px] font-mono text-slate-400 ml-auto">
               {positions.length}종목
             </span>
           </div>
@@ -202,7 +202,7 @@ export default function AlpacaAccountPanel() {
                   <div className="text-xs text-foreground font-medium">
                     {pos.symbol}
                   </div>
-                  <div className="text-[10px] text-muted-foreground/60">
+                  <div className="text-[10px] text-slate-400">
                     {pos.qty}주 @ ${pos.avgEntryPrice.toFixed(2)}
                   </div>
                 </div>
@@ -223,7 +223,7 @@ export default function AlpacaAccountPanel() {
       {positions.length === 0 && (
         <>
           <Separator className="bg-border/50" />
-          <div className="text-[10px] font-mono text-muted-foreground/65 py-2 text-center border border-dashed border-border/50 rounded">
+          <div className="text-[10px] font-mono text-slate-400 py-2 text-center border border-dashed border-border/50 rounded">
             보유 포지션 없음
           </div>
         </>

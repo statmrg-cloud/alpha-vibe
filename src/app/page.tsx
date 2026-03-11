@@ -1,6 +1,5 @@
 import Header from "@/components/layout/Header";
-import ChatPanel from "@/components/chat/ChatPanel";
-import DataPanel from "@/components/data/DataPanel";
+import ResizableLayout from "@/components/layout/ResizableLayout";
 
 export default function Home() {
   return (
@@ -8,21 +7,11 @@ export default function Home() {
       {/* 상단 헤더 — 시장 지수 티커 */}
       <Header />
 
-      {/* 메인 콘텐츠 — 채팅 + 데이터 패널 */}
-      <main className="flex-1 flex overflow-hidden">
-        {/* 좌측: AI 채팅 패널 */}
-        <div className="flex-1 border-r border-border/50 min-w-0">
-          <ChatPanel />
-        </div>
-
-        {/* 우측: 데이터 패널 */}
-        <div className="w-[400px] shrink-0 bg-card/30 backdrop-blur-sm">
-          <DataPanel />
-        </div>
-      </main>
+      {/* 메인 콘텐츠 — 채팅 + 데이터 패널 (리사이즈 가능) */}
+      <ResizableLayout />
 
       {/* 하단 상태바 */}
-      <footer className="h-6 border-t border-border/50 bg-card/60 backdrop-blur-sm flex items-center px-4 text-[11px] font-mono text-muted-foreground/70 shrink-0">
+      <footer className="h-6 border-t border-border/50 bg-card/60 backdrop-blur-sm flex items-center px-4 text-[11px] font-mono text-slate-300 shrink-0">
         <span className="tracking-wider">ALPHA-VIBE v0.1.0</span>
         <div className="w-px h-2.5 bg-border/30 mx-3" />
         <span>Next.js 14 + Claude Sonnet + Recharts</span>

@@ -39,7 +39,7 @@ interface EngineStatus {
 const LOG_TYPE_COLORS: Record<string, string> = {
   CHECK: "text-muted-foreground",
   BUY: "text-up",
-  SKIP: "text-muted-foreground/60",
+  SKIP: "text-slate-400",
   STOP_LOSS: "text-destructive",
   ERROR: "text-destructive",
   START: "text-primary",
@@ -149,7 +149,7 @@ export default function AutoTradePanel() {
 
   if (!config || !status) {
     return (
-      <div className="p-3 text-center text-muted-foreground/70 font-mono text-xs">
+      <div className="p-3 text-center text-slate-300 font-mono text-xs">
         로딩 중...
       </div>
     );
@@ -164,7 +164,7 @@ export default function AutoTradePanel() {
           <span className="text-[10px] font-mono font-bold text-foreground tracking-wider">
             AUTO TRADE
           </span>
-          <span className="text-[10px] font-mono text-muted-foreground/70 px-1 py-0.5 rounded border border-border/40">
+          <span className="text-[10px] font-mono text-slate-300 px-1 py-0.5 rounded border border-border/40">
             US ONLY
           </span>
           {status.enabled && (
@@ -217,7 +217,7 @@ export default function AutoTradePanel() {
             className={`text-[11px] font-mono px-2 py-0.5 rounded-t transition-all ${
               tab === t
                 ? "text-primary border-b border-primary bg-primary/5"
-                : "text-muted-foreground/70 hover:text-muted-foreground"
+                : "text-slate-300 hover:text-muted-foreground"
             }`}
           >
             {t === "control" ? "설정" : t === "watchlist" ? "관심종목" : "로그"}
@@ -308,17 +308,17 @@ export default function AutoTradePanel() {
                 </button>
                 <span
                   className={`text-[10px] font-mono flex-1 ${
-                    item.enabled ? "text-foreground" : "text-muted-foreground/65 line-through"
+                    item.enabled ? "text-foreground" : "text-slate-400 line-through"
                   }`}
                 >
                   {item.name}
-                  <span className="text-muted-foreground/70 ml-1">
+                  <span className="text-slate-300 ml-1">
                     ({item.symbol})
                   </span>
                 </span>
                 <button
                   onClick={() => handleRemoveSymbol(item.symbol)}
-                  className="text-muted-foreground/60 hover:text-destructive text-xs transition-colors"
+                  className="text-slate-400 hover:text-destructive text-xs transition-colors"
                 >
                   x
                 </button>
@@ -356,19 +356,19 @@ export default function AutoTradePanel() {
       {tab === "logs" && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono text-muted-foreground/70">
+            <span className="text-[11px] font-mono text-slate-300">
               최근 {logs.length}건
             </span>
             <button
               onClick={handleClearLogs}
-              className="text-[10px] font-mono text-muted-foreground/60 hover:text-destructive transition-colors"
+              className="text-[10px] font-mono text-slate-400 hover:text-destructive transition-colors"
             >
               초기화
             </button>
           </div>
           <div className="max-h-[250px] overflow-y-auto space-y-0.5 scrollbar-thin">
             {logs.length === 0 ? (
-              <div className="text-center text-muted-foreground/60 font-mono text-[10px] py-4">
+              <div className="text-center text-slate-400 font-mono text-[10px] py-4">
                 로그가 없습니다
               </div>
             ) : (
@@ -385,7 +385,7 @@ export default function AutoTradePanel() {
                       {log.message}
                     </span>
                   </div>
-                  <div className="text-muted-foreground/60 text-[10px] mt-0.5">
+                  <div className="text-slate-400 text-[10px] mt-0.5">
                     {new Date(log.timestamp).toLocaleString("ko-KR", {
                       month: "2-digit",
                       day: "2-digit",
