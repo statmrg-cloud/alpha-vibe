@@ -16,7 +16,7 @@
     --secondary: 220 12% 15%;         /* 서브 패널 배경 (밝기 향상) */
     --secondary-foreground: 210 20% 78%;
     --muted: 220 12% 16%;
-    --muted-foreground: 215 15% 58%;
+    --muted-foreground: 215 15% 65%;
     --accent: 199 89% 48%;            /* #0ea5e9 하이라이트 블루 */
     --accent-foreground: 0 0% 98%;
     --destructive: 0 72% 56%;         /* #ef4444 하락/음봉 레드 */
@@ -30,7 +30,7 @@
     --chart-4: 45 93% 58%;            /* 앰버 */
     --chart-5: 270 70% 60%;           /* 퍼플 */
     --radius: 0.5rem;
-    --font-scale: 1;
+    --font-scale: 1.05;
   }
 }
 
@@ -108,10 +108,10 @@
 }
 
 /* Theme font size variants */
-.font-scale-sm { --font-scale: 0.9; }
-.font-scale-md { --font-scale: 1; }
-.font-scale-lg { --font-scale: 1.1; }
-.font-scale-xl { --font-scale: 1.2; }
+.font-scale-sm { --font-scale: 0.95; }
+.font-scale-md { --font-scale: 1.05; }
+.font-scale-lg { --font-scale: 1.15; }
+.font-scale-xl { --font-scale: 1.25; }
 
 /* Recharts 차트 커스텀 */
 .recharts-cartesian-grid-horizontal line,

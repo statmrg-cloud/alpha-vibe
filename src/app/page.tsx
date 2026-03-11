@@ -22,7 +22,7 @@ export default function Home() {
       </main>
 
       {/* 하단 상태바 */}
-      <footer className="h-6 border-t border-border/50 bg-card/60 backdrop-blur-sm flex items-center px-4 text-[9px] font-mono text-muted-foreground/50 shrink-0">
+      <footer className="h-6 border-t border-border/50 bg-card/60 backdrop-blur-sm flex items-center px-4 text-[11px] font-mono text-muted-foreground/70 shrink-0">
         <span className="tracking-wider">ALPHA-VIBE v0.1.0</span>
         <div className="w-px h-2.5 bg-border/30 mx-3" />
         <span>Next.js 14 + Claude Sonnet + Recharts</span>

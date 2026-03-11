@@ -83,7 +83,7 @@ export default function AlpacaAccountPanel() {
   // 로딩
   if (loading) {
     return (
-      <div className="p-3 text-center text-muted-foreground/50 font-mono text-xs animate-pulse">
+      <div className="p-3 text-center text-muted-foreground/70 font-mono text-xs animate-pulse">
         Alpaca 계좌 조회 중...
       </div>
     );
@@ -99,7 +99,7 @@ export default function AlpacaAccountPanel() {
             ALPACA ACCOUNT
           </span>
         </div>
-        <div className="text-[10px] font-mono text-muted-foreground/40 py-3 text-center border border-dashed border-border/50 rounded">
+        <div className="text-[10px] font-mono text-muted-foreground/65 py-3 text-center border border-dashed border-border/50 rounded">
           {error || "Alpaca API 키를 .env.local에 설정하세요"}
         </div>
       </div>
@@ -124,14 +124,14 @@ export default function AlpacaAccountPanel() {
           {account.isPaper && (
             <Badge
               variant="outline"
-              className="text-[8px] h-[18px] border-chart-4/40 text-chart-4 px-1.5"
+              className="text-[10px] h-[18px] border-chart-4/40 text-chart-4 px-1.5"
             >
               PAPER
             </Badge>
           )}
           <button
             onClick={() => { setLoading(true); fetchData(); }}
-            className="text-[9px] font-mono text-muted-foreground/40 hover:text-primary transition-colors"
+            className="text-[11px] font-mono text-muted-foreground/65 hover:text-primary transition-colors"
             title="새로고침"
           >
             REFRESH
@@ -188,7 +188,7 @@ export default function AlpacaAccountPanel() {
             <span className="text-[10px] font-mono text-muted-foreground tracking-wider">
               POSITIONS
             </span>
-            <span className="text-[9px] font-mono text-muted-foreground/40 ml-auto">
+            <span className="text-[11px] font-mono text-muted-foreground/65 ml-auto">
               {positions.length}종목
             </span>
           </div>
@@ -223,7 +223,7 @@ export default function AlpacaAccountPanel() {
       {positions.length === 0 && (
         <>
           <Separator className="bg-border/50" />
-          <div className="text-[10px] font-mono text-muted-foreground/40 py-2 text-center border border-dashed border-border/50 rounded">
+          <div className="text-[10px] font-mono text-muted-foreground/65 py-2 text-center border border-dashed border-border/50 rounded">
             보유 포지션 없음
           </div>
         </>

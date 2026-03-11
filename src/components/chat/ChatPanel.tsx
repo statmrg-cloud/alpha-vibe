@@ -205,7 +205,7 @@ export default function ChatPanel() {
           </span>
         </div>
         <div className="w-px h-3.5 bg-border/30 mx-3" />
-        <span className="text-[9px] font-mono text-muted-foreground/50 tracking-wide">
+        <span className="text-[11px] font-mono text-muted-foreground/70 tracking-wide">
           Claude Sonnet 4 | Hedge Fund Strategist
         </span>
         <div className="ml-auto flex gap-1.5">
@@ -238,11 +238,11 @@ export default function ChatPanel() {
                     {msg.role === "assistant" && (
                       <div className="flex items-center gap-1.5 mb-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                        <span className="text-[9px] font-mono text-primary/80 tracking-widest font-medium">ALPHA-VIBE</span>
+                        <span className="text-[11px] font-mono text-primary/80 tracking-widest font-medium">ALPHA-VIBE</span>
                       </div>
                     )}
                     <p className="whitespace-pre-wrap font-mono text-xs leading-relaxed">{msg.content}</p>
-                    <span className="text-[9px] text-muted-foreground/40 mt-1.5 block font-mono" suppressHydrationWarning>
+                    <span className="text-[11px] text-muted-foreground/65 mt-1.5 block font-mono" suppressHydrationWarning>
                       {new Date(msg.timestamp).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
                     </span>
 
@@ -251,7 +251,7 @@ export default function ChatPanel() {
                       <div className="mt-3 pt-2.5 border-t border-border/50 space-y-3">
                         {/* 모의 투자 */}
                         <div className="space-y-1.5">
-                          <span className="text-[9px] font-mono text-muted-foreground/60 block tracking-wider">
+                          <span className="text-[11px] font-mono text-muted-foreground/60 block tracking-wider">
                             PAPER TRADE (모의투자)
                           </span>
                           {msg.symbols.map((sym) => {
@@ -266,7 +266,7 @@ export default function ChatPanel() {
                               <Button
                                 size="sm"
                                 onClick={() => handleTrade(sym, "BUY")}
-                                className="h-5 px-2 text-[9px] font-mono font-bold bg-primary/10 text-up border border-primary/20 hover:bg-primary/20"
+                                className="h-5 px-2 text-[11px] font-mono font-bold bg-primary/10 text-up border border-primary/20 hover:bg-primary/20"
                                 variant="outline"
                               >
                                 매수
@@ -274,7 +274,7 @@ export default function ChatPanel() {
                               <Button
                                 size="sm"
                                 onClick={() => handleTrade(sym, "SELL")}
-                                className="h-5 px-2 text-[9px] font-mono font-bold bg-destructive/10 text-down border border-destructive/20 hover:bg-destructive/20"
+                                className="h-5 px-2 text-[11px] font-mono font-bold bg-destructive/10 text-down border border-destructive/20 hover:bg-destructive/20"
                                 variant="outline"
                               >
                                 매도
@@ -287,10 +287,10 @@ export default function ChatPanel() {
                         {msg.symbols.some((sym) => !sym.endsWith(".KS") && !sym.endsWith(".KQ")) && (
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] font-mono text-chart-4/70 block tracking-wider">
+                            <span className="text-[11px] font-mono text-chart-4/70 block tracking-wider">
                               REAL TRADE (Alpaca)
                             </span>
-                            <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-chart-4/10 text-chart-4/60 border border-chart-4/20">
+                            <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-chart-4/10 text-chart-4/60 border border-chart-4/20">
                               PAPER
                             </span>
                           </div>
@@ -305,7 +305,7 @@ export default function ChatPanel() {
                               <Button
                                 size="sm"
                                 onClick={() => handleRealTrade(sym, "buy")}
-                                className="h-5 px-2 text-[9px] font-mono font-bold bg-chart-4/10 text-chart-4 border border-chart-4/20 hover:bg-chart-4/20"
+                                className="h-5 px-2 text-[11px] font-mono font-bold bg-chart-4/10 text-chart-4 border border-chart-4/20 hover:bg-chart-4/20"
                                 variant="outline"
                               >
                                 실매수
@@ -313,7 +313,7 @@ export default function ChatPanel() {
                               <Button
                                 size="sm"
                                 onClick={() => handleRealTrade(sym, "sell")}
-                                className="h-5 px-2 text-[9px] font-mono font-bold bg-chart-4/10 text-chart-4 border border-chart-4/20 hover:bg-chart-4/20"
+                                className="h-5 px-2 text-[11px] font-mono font-bold bg-chart-4/10 text-chart-4 border border-chart-4/20 hover:bg-chart-4/20"
                                 variant="outline"
                               >
                                 실매도
@@ -363,7 +363,7 @@ export default function ChatPanel() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="종목, 시장 분석, 투자 전략을 질문하세요..."
-              className="pl-7 bg-secondary/60 border-border/50 text-foreground font-mono text-xs h-9 placeholder:text-muted-foreground/30 focus-visible:ring-primary/20 focus-visible:border-primary/30 transition-colors"
+              className="pl-7 bg-secondary/60 border-border/50 text-foreground font-mono text-xs h-9 placeholder:text-muted-foreground/60 focus-visible:ring-primary/20 focus-visible:border-primary/30 transition-colors"
               disabled={isLoading}
             />
           </div>
@@ -381,7 +381,7 @@ export default function ChatPanel() {
             <button
               key={q}
               onClick={() => setInput(q)}
-              className="text-[9px] font-mono px-2.5 py-1 rounded-md border border-border/40 text-muted-foreground/50 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-all"
+              className="text-[11px] font-mono px-2.5 py-1 rounded-md border border-border/40 text-muted-foreground/70 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-all"
               disabled={isLoading}
             >
               {q}

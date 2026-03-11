@@ -75,7 +75,7 @@ export default function Header() {
         </span>
         <Badge
           variant="outline"
-          className="text-[8px] h-[16px] px-1.5 border-primary/30 text-primary font-bold tracking-widest"
+          className="text-[10px] h-[16px] px-1.5 border-primary/30 text-primary font-bold tracking-widest"
         >
           LIVE
         </Badge>

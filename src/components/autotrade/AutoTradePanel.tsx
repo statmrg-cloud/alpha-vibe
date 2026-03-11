@@ -149,7 +149,7 @@ export default function AutoTradePanel() {
 
   if (!config || !status) {
     return (
-      <div className="p-3 text-center text-muted-foreground/50 font-mono text-xs">
+      <div className="p-3 text-center text-muted-foreground/70 font-mono text-xs">
         로딩 중...
       </div>
     );
@@ -164,11 +164,11 @@ export default function AutoTradePanel() {
           <span className="text-[10px] font-mono font-bold text-foreground tracking-wider">
             AUTO TRADE
           </span>
-          <span className="text-[7px] font-mono text-muted-foreground/50 px-1 py-0.5 rounded border border-border/40">
+          <span className="text-[10px] font-mono text-muted-foreground/70 px-1 py-0.5 rounded border border-border/40">
             US ONLY
           </span>
           {status.enabled && (
-            <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-up/10 text-up border border-up/20">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-up/10 text-up border border-up/20">
               ACTIVE
             </span>
           )}
@@ -177,7 +177,7 @@ export default function AutoTradePanel() {
           size="sm"
           onClick={handleToggleEngine}
           disabled={loading}
-          className={`h-5 px-2.5 text-[9px] font-mono font-bold tracking-wider ${
+          className={`h-5 px-2.5 text-[11px] font-mono font-bold tracking-wider ${
             status.enabled
               ? "bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20"
               : "bg-up/10 text-up border border-up/20 hover:bg-up/20"
@@ -214,10 +214,10 @@ export default function AutoTradePanel() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`text-[9px] font-mono px-2 py-0.5 rounded-t transition-all ${
+            className={`text-[11px] font-mono px-2 py-0.5 rounded-t transition-all ${
               tab === t
                 ? "text-primary border-b border-primary bg-primary/5"
-                : "text-muted-foreground/50 hover:text-muted-foreground"
+                : "text-muted-foreground/70 hover:text-muted-foreground"
             }`}
           >
             {t === "control" ? "설정" : t === "watchlist" ? "관심종목" : "로그"}
@@ -268,7 +268,7 @@ export default function AutoTradePanel() {
                 onClick={() =>
                   handleUpdateConfig({ requireStrongBuy: !config.requireStrongBuy })
                 }
-                className={`px-2 py-0.5 rounded border text-[9px] transition-all ${
+                className={`px-2 py-0.5 rounded border text-[11px] transition-all ${
                   config.requireStrongBuy
                     ? "border-chart-4/30 bg-chart-4/10 text-chart-4"
                     : "border-up/30 bg-up/10 text-up"
@@ -308,17 +308,17 @@ export default function AutoTradePanel() {
                 </button>
                 <span
                   className={`text-[10px] font-mono flex-1 ${
-                    item.enabled ? "text-foreground" : "text-muted-foreground/40 line-through"
+                    item.enabled ? "text-foreground" : "text-muted-foreground/65 line-through"
                   }`}
                 >
                   {item.name}
-                  <span className="text-muted-foreground/50 ml-1">
+                  <span className="text-muted-foreground/70 ml-1">
                     ({item.symbol})
                   </span>
                 </span>
                 <button
                   onClick={() => handleRemoveSymbol(item.symbol)}
-                  className="text-muted-foreground/30 hover:text-destructive text-xs transition-colors"
+                  className="text-muted-foreground/60 hover:text-destructive text-xs transition-colors"
                 >
                   x
                 </button>
@@ -343,7 +343,7 @@ export default function AutoTradePanel() {
               size="sm"
               onClick={handleAddSymbol}
               disabled={!newSymbol.trim()}
-              className="h-5 px-2 text-[9px] font-mono bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20"
+              className="h-5 px-2 text-[11px] font-mono bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20"
               variant="outline"
             >
               추가
@@ -356,26 +356,26 @@ export default function AutoTradePanel() {
       {tab === "logs" && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] font-mono text-muted-foreground/50">
+            <span className="text-[11px] font-mono text-muted-foreground/70">
               최근 {logs.length}건
             </span>
             <button
               onClick={handleClearLogs}
-              className="text-[8px] font-mono text-muted-foreground/30 hover:text-destructive transition-colors"
+              className="text-[10px] font-mono text-muted-foreground/60 hover:text-destructive transition-colors"
             >
               초기화
             </button>
           </div>
           <div className="max-h-[250px] overflow-y-auto space-y-0.5 scrollbar-thin">
             {logs.length === 0 ? (
-              <div className="text-center text-muted-foreground/30 font-mono text-[10px] py-4">
+              <div className="text-center text-muted-foreground/60 font-mono text-[10px] py-4">
                 로그가 없습니다
               </div>
             ) : (
               logs.map((log) => (
                 <div
                   key={log.id}
-                  className="bg-secondary/20 rounded px-2 py-1 font-mono text-[9px] leading-relaxed"
+                  className="bg-secondary/20 rounded px-2 py-1 font-mono text-[11px] leading-relaxed"
                 >
                   <div className="flex items-start gap-1.5">
                     <span className={`font-bold shrink-0 ${LOG_TYPE_COLORS[log.type] || "text-foreground"}`}>
@@ -385,7 +385,7 @@ export default function AutoTradePanel() {
                       {log.message}
                     </span>
                   </div>
-                  <div className="text-muted-foreground/30 text-[8px] mt-0.5">
+                  <div className="text-muted-foreground/60 text-[10px] mt-0.5">
                     {new Date(log.timestamp).toLocaleString("ko-KR", {
                       month: "2-digit",
                       day: "2-digit",

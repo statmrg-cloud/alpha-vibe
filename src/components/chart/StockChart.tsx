@@ -563,7 +563,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
 
   if (error || chartData.length === 0) {
     return (
-      <div className={`flex items-center justify-center ${compact ? "h-[100px]" : "h-[400px]"} text-[10px] font-mono text-muted-foreground/50`}>
+      <div className={`flex items-center justify-center ${compact ? "h-[100px]" : "h-[400px]"} text-xs font-mono text-muted-foreground/70`}>
         {error || "데이터 없음"}
       </div>
     );
@@ -577,6 +577,12 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
       if (d.bbLower != null) allPrices.push(d.bbLower);
     });
   }
+  // SMA 라인이 Y축 범위에 포함되도록 (SMA200이 현재 가격과 멀면 차트가 찌그러지는 버그 수정)
+  visibleData.forEach((d) => {
+    if (indicators.sma20 && d.sma20 != null) allPrices.push(d.sma20);
+    if (indicators.sma50 && d.sma50 != null) allPrices.push(d.sma50);
+    if (indicators.sma200 && d.sma200 != null) allPrices.push(d.sma200);
+  });
   const minPrice = Math.min(...allPrices);
   const maxPrice = Math.max(...allPrices);
   const pricePadding = (maxPrice - minPrice) * 0.05 || 1;
@@ -608,7 +614,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
     const maxVol = Math.max(...visibleData.map((d) => d.volume));
     return (
       <div key="sub-volume">
-        <div className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground/60 mb-0.5">
+        <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground/60 mb-0.5">
           <span>거래량</span>
         </div>
         <ResponsiveContainer width="100%" height={subHeight}>
@@ -618,7 +624,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
               domain={[0, maxVol * 1.1]}
               axisLine={false}
               tickLine={false}
-              tick={{ fontSize: 8, fill: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}
+              tick={{ fontSize: 10, fill: "rgba(255,255,255,0.55)", fontFamily: "monospace" }}
               tickFormatter={(v: number) => v >= 1000000 ? `${(v / 1000000).toFixed(0)}M` : `${(v / 1000).toFixed(0)}K`}
               width={42}
             />
@@ -635,9 +641,9 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
 
   const renderCCI = () => (
     <div key="sub-cci">
-      <div className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground/60 mb-0.5">
+      <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground/60 mb-0.5">
         <span className="text-cyan-400">CCI</span>
-        <span className="text-muted-foreground/30">(-100/+100 기준선)</span>
+        <span className="text-muted-foreground/60">(-100/+100 기준선)</span>
       </div>
       <ResponsiveContainer width="100%" height={subHeight}>
         <ComposedChart data={visibleData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
@@ -646,7 +652,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
             domain={[-300, 300]}
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 8, fill: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}
+            tick={{ fontSize: 10, fill: "rgba(255,255,255,0.55)", fontFamily: "monospace" }}
             ticks={[-200, -100, 0, 100, 200]}
             width={42}
           />
@@ -662,9 +668,9 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
 
   const renderRSI = () => (
     <div key="sub-rsi">
-      <div className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground/60 mb-0.5">
+      <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground/60 mb-0.5">
         <span className="text-pink-400">RSI</span>
-        <span className="text-muted-foreground/30">(30 과매도 / 70 과매수)</span>
+        <span className="text-muted-foreground/60">(30 과매도 / 70 과매수)</span>
       </div>
       <ResponsiveContainer width="100%" height={subHeight}>
         <ComposedChart data={visibleData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
@@ -673,7 +679,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
             domain={[0, 100]}
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 8, fill: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}
+            tick={{ fontSize: 10, fill: "rgba(255,255,255,0.55)", fontFamily: "monospace" }}
             ticks={[30, 50, 70]}
             width={42}
           />
@@ -688,7 +694,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
 
   const renderMACD = () => (
     <div key="sub-macd">
-      <div className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground/60 mb-0.5">
+      <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground/60 mb-0.5">
         <span className="text-blue-400">MACD</span>
       </div>
       <ResponsiveContainer width="100%" height={subHeight}>
@@ -697,7 +703,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
           <YAxis
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 8, fill: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}
+            tick={{ fontSize: 10, fill: "rgba(255,255,255,0.55)", fontFamily: "monospace" }}
             width={42}
           />
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
@@ -736,7 +742,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
             const displayName = korName || livePrice?.name;
             if (!displayName) return null;
             return (
-              <span className={`text-[10px] font-mono font-semibold truncate max-w-[120px] ${
+              <span className={`text-xs font-mono font-semibold truncate max-w-[120px] ${
                 isKorean ? "text-yellow-400" : "text-sky-400"
               }`}>
                 {displayName}
@@ -754,7 +760,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
               >
                 {fmtPrice(livePrice.price)}
               </span>
-              <span className={`font-mono text-[10px] font-medium ml-2 ${livePrice.changePercent >= 0 ? "text-up" : "text-down"}`}>
+              <span className={`font-mono text-xs font-medium ml-2 ${livePrice.changePercent >= 0 ? "text-up" : "text-down"}`}>
                 {livePrice.changePercent >= 0 ? "+" : ""}{livePrice.changePercent.toFixed(2)}%
               </span>
             </>
@@ -773,7 +779,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
             <button
               key={tf.key}
               onClick={() => setTimeframe(tf.key)}
-              className={`px-1.5 py-0.5 text-[9px] font-mono rounded transition-colors ${
+              className={`px-1.5 py-0.5 text-[11px] font-mono rounded transition-colors ${
                 timeframe === tf.key
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary"
@@ -786,13 +792,13 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
         <div className="flex items-center gap-1">
           <button
             onClick={() => setChartType(chartType === "candle" ? "line" : "candle")}
-            className="px-1.5 py-0.5 text-[9px] font-mono rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="px-1.5 py-0.5 text-[11px] font-mono rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           >
             {chartType === "candle" ? "📊캔들" : "📈라인"}
           </button>
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className={`px-1.5 py-0.5 text-[9px] font-mono rounded transition-colors ${
+            className={`px-1.5 py-0.5 text-[11px] font-mono rounded transition-colors ${
               showSettings ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
             }`}
           >
@@ -804,7 +810,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
       {/* 지표 설정 패널 */}
       {showSettings && (
         <div className="bg-secondary/50 rounded-lg p-2 space-y-1.5">
-          <div className="text-[9px] font-mono text-muted-foreground font-bold">오버레이 지표</div>
+          <div className="text-[11px] font-mono text-muted-foreground font-bold">오버레이 지표</div>
           <div className="flex flex-wrap gap-1">
             {(
               [
@@ -818,17 +824,17 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
               <button
                 key={ind.key}
                 onClick={() => setIndicators((prev) => ({ ...prev, [ind.key]: !prev[ind.key] }))}
-                className={`px-1.5 py-0.5 text-[9px] font-mono rounded border transition-colors ${
+                className={`px-1.5 py-0.5 text-[11px] font-mono rounded border transition-colors ${
                   indicators[ind.key]
                     ? ind.color
-                    : "border-border text-muted-foreground/50 hover:text-muted-foreground"
+                    : "border-border text-muted-foreground/70 hover:text-muted-foreground"
                 }`}
               >
                 {ind.label}
               </button>
             ))}
           </div>
-          <div className="text-[9px] font-mono text-muted-foreground font-bold mt-1">하단 지표 (복수 선택 가능)</div>
+          <div className="text-[11px] font-mono text-muted-foreground font-bold mt-1">하단 지표 (복수 선택 가능)</div>
           <div className="flex gap-1">
             {SUB_INDICATORS.map((si) => (
               <button
@@ -842,10 +848,10 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
                   }
                   return next;
                 })}
-                className={`px-1.5 py-0.5 text-[9px] font-mono rounded border transition-colors ${
+                className={`px-1.5 py-0.5 text-[11px] font-mono rounded border transition-colors ${
                   subIndicators.has(si.key)
                     ? "bg-primary/20 text-primary border-primary/30"
-                    : "border-border text-muted-foreground/50 hover:text-muted-foreground"
+                    : "border-border text-muted-foreground/70 hover:text-muted-foreground"
                 }`}
               >
                 {si.label}
@@ -856,7 +862,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
       )}
 
       {/* 활성 지표 범례 */}
-      <div className="flex flex-wrap gap-2 text-[8px] font-mono">
+      <div className="flex flex-wrap gap-2 text-[10px] font-mono">
         {indicators.sma20 && <span className="text-yellow-400">● SMA20</span>}
         {indicators.sma50 && <span className="text-purple-400">● SMA50</span>}
         {indicators.sma200 && <span className="text-orange-400">● SMA200</span>}
@@ -865,26 +871,26 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
       </div>
 
       {/* 줌 컨트롤 */}
-      <div className="flex items-center justify-between text-[8px] font-mono text-muted-foreground/50">
-        <span className="text-muted-foreground/30">스크롤=줌 | 드래그=이동</span>
+      <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground/70">
+        <span className="text-muted-foreground/60">스크롤=줌 | 드래그=이동</span>
         <div className="flex items-center gap-1">
           <button
             onClick={handleZoomIn}
-            className="px-1.5 py-0.5 rounded bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors text-[10px]"
+            className="px-1.5 py-0.5 rounded bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors text-xs"
             title="줌인"
           >
             +
           </button>
           <button
             onClick={handleZoomOut}
-            className="px-1.5 py-0.5 rounded bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors text-[10px]"
+            className="px-1.5 py-0.5 rounded bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors text-xs"
             title="줌아웃"
           >
             -
           </button>
           {isZoomed && (
             <>
-              <span className="text-muted-foreground/40 mx-0.5">{Math.round((zoomRange[1] - zoomRange[0]) * 100)}%</span>
+              <span className="text-muted-foreground/65 mx-0.5">{Math.round((zoomRange[1] - zoomRange[0]) * 100)}%</span>
               <button
                 onClick={() => setZoomRange(DEFAULT_ZOOM)}
                 className="px-1 py-0.5 rounded bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
@@ -905,7 +911,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
             dataKey="date"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 8, fill: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}
+            tick={{ fontSize: 10, fill: "rgba(255,255,255,0.55)", fontFamily: "monospace" }}
             tickFormatter={(v: string) => formatDateLabel(v, timeframe)}
             interval="preserveStartEnd"
             minTickGap={40}
@@ -914,7 +920,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
             domain={[minPrice - pricePadding, maxPrice + pricePadding]}
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 8, fill: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}
+            tick={{ fontSize: 10, fill: "rgba(255,255,255,0.55)", fontFamily: "monospace" }}
             tickFormatter={fmtAxisPrice}
             width={48}
             orientation="right"
