@@ -43,9 +43,10 @@ type ChartType = "candle" | "line";
 type SubIndicator = "volume" | "cci" | "rsi" | "macd";
 
 interface IndicatorSettings {
+  sma5: boolean;
   sma20: boolean;
-  sma50: boolean;
-  sma200: boolean;
+  sma60: boolean;
+  sma120: boolean;
   bb: boolean;
   gcdc: boolean;
 }
@@ -65,9 +66,10 @@ interface ChartDataPoint {
   wickLow: number;
   isUp: boolean;
   // 지표
+  sma5?: number | null;
   sma20?: number | null;
-  sma50?: number | null;
-  sma200?: number | null;
+  sma60?: number | null;
+  sma120?: number | null;
   bbUpper?: number | null;
   bbMiddle?: number | null;
   bbLower?: number | null;
@@ -209,51 +211,47 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   useEffect(() => { zoomRangeRef.current = zoomRange; }, [zoomRange]);
 
   const [indicators, setIndicators] = useState<IndicatorSettings>({
-    sma20: true,
-    sma50: false,
-    sma200: false,
+    sma5: true,
+    sma20: false,
+    sma60: false,
+    sma120: false,
     bb: false,
     gcdc: false,
   });
 
-  // SMA200용 일봉 데이터 (분봉 차트에서 진짜 200일선을 그리기 위함)
-  const [dailySma200, setDailySma200] = useState<Map<string, number>>(new Map());
-  // 모든 타임프레임에서 일봉 기반 SMA200 사용 (차트 데이터의 calcSMA는 분/주/월봉 평균이라 200일선이 아님)
-  const needsDailySma200 = indicators.sma200;
+  // SMA60/120용 일봉 데이터 (분봉 차트에서 진짜 일봉 이동평균을 그리기 위함)
+  const [dailySmaData, setDailySmaData] = useState<Map<string, { sma60: number | null; sma120: number | null }>>(new Map());
+  const needsDailySma = indicators.sma60 || indicators.sma120;
 
-  // SMA200용 일봉 데이터 별도 fetch (분봉/1M에서 200일선 계산)
+  // SMA60/120용 일봉 데이터 별도 fetch (분봉/주봉 차트에서 일봉 기준 이동평균 계산)
   useEffect(() => {
-    if (!needsDailySma200) {
-      setDailySma200(new Map());
+    if (!needsDailySma) {
+      setDailySmaData(new Map());
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        // 2년치 일봉 = ~500 거래일 → SMA200 계산에 충분
         const res = await fetch(
           `/api/stock/history?symbol=${encodeURIComponent(symbol)}&timeframe=sma200`
         );
         if (!res.ok || cancelled) return;
         const json = await res.json();
         const quotes: OHLCV[] = json.quotes || [];
-        if (quotes.length < 200) return;
+        if (quotes.length < 60) return;
 
-        // 일봉으로 SMA200 계산
-        const smaValues = calcSMA(quotes, 200);
-        const smaMap = new Map<string, number>();
+        const sma60Vals = calcSMA(quotes, 60);
+        const sma120Vals = quotes.length >= 120 ? calcSMA(quotes, 120) : quotes.map(() => null);
+        const smaMap = new Map<string, { sma60: number | null; sma120: number | null }>();
         quotes.forEach((q, i) => {
-          if (smaValues[i] !== null) {
-            // 날짜 키: "2026-03-09" 형식
-            const dateKey = new Date(q.date).toISOString().slice(0, 10);
-            smaMap.set(dateKey, smaValues[i] as number);
-          }
+          const dateKey = new Date(q.date).toISOString().slice(0, 10);
+          smaMap.set(dateKey, { sma60: sma60Vals[i], sma120: sma120Vals[i] });
         });
-        if (!cancelled) setDailySma200(smaMap);
+        if (!cancelled) setDailySmaData(smaMap);
       } catch { /* silent */ }
     })();
     return () => { cancelled = true; };
-  }, [symbol, needsDailySma200]);
+  }, [symbol, needsDailySma]);
 
   // ─── 데이터 fetch ──────────────────────────────────
   const fetchChartData = useCallback(async () => {
@@ -461,34 +459,36 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   const chartData: ChartDataPoint[] = useMemo(() => {
     if (rawData.length === 0) return [];
 
+    const sma5 = indicators.sma5 ? calcSMA(rawData, 5) : null;
     const sma20 = indicators.sma20 ? calcSMA(rawData, 20) : null;
-    const sma50 = indicators.sma50 ? calcSMA(rawData, 50) : null;
-    // SMA200: 분봉/1M에서는 별도 일봉 데이터로 계산 (dailySma200), 3M+ 에서는 차트 데이터로 직접 계산
-    const sma200FromChart = (indicators.sma200 && !needsDailySma200) ? calcSMA(rawData, 200) : null;
     const bb = indicators.bb ? calcBollingerBands(rawData) : null;
     const cci = subIndicators.has("cci") ? calcCCI(rawData) : null;
     const rsi = subIndicators.has("rsi") ? calcRSI(rawData) : null;
     const macd = subIndicators.has("macd") ? calcMACD(rawData) : null;
 
+    // 일봉 SMA60/120 키 목록 (분봉에서 가장 가까운 날짜 매핑용)
+    const dailyKeys = needsDailySma && dailySmaData.size > 0 ? Array.from(dailySmaData.keys()).sort() : [];
+
     return rawData.map((d, i) => {
       const isUp = d.close >= d.open;
 
-      // SMA200: 분봉/1M인 경우 일봉 SMA200에서 해당 날짜 값을 매핑
-      let sma200Val: number | null = null;
-      if (sma200FromChart) {
-        sma200Val = sma200FromChart[i];
-      } else if (needsDailySma200 && dailySma200.size > 0) {
+      // SMA60/120: 일봉 데이터에서 해당 날짜 값을 매핑
+      let sma60Val: number | null = null;
+      let sma120Val: number | null = null;
+      if (needsDailySma && dailySmaData.size > 0) {
         const dateKey = new Date(d.date).toISOString().slice(0, 10);
-        sma200Val = dailySma200.get(dateKey) ?? null;
-        // 분봉 차트에서 정확한 날짜 매핑이 안 되면, 가장 가까운 이전 날짜 사용
-        if (sma200Val === null) {
-          const keys = Array.from(dailySma200.keys()).sort();
-          for (let k = keys.length - 1; k >= 0; k--) {
-            if (keys[k] <= dateKey) {
-              sma200Val = dailySma200.get(keys[k]) ?? null;
+        let entry = dailySmaData.get(dateKey);
+        if (!entry && dailyKeys.length > 0) {
+          for (let k = dailyKeys.length - 1; k >= 0; k--) {
+            if (dailyKeys[k] <= dateKey) {
+              entry = dailySmaData.get(dailyKeys[k]);
               break;
             }
           }
+        }
+        if (entry) {
+          sma60Val = indicators.sma60 ? entry.sma60 : null;
+          sma120Val = indicators.sma120 ? entry.sma120 : null;
         }
       }
 
@@ -505,9 +505,10 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
         wickHigh: d.high,
         wickLow: d.low,
         isUp,
+        sma5: sma5 ? sma5[i] : null,
         sma20: sma20 ? sma20[i] : null,
-        sma50: sma50 ? sma50[i] : null,
-        sma200: sma200Val,
+        sma60: sma60Val,
+        sma120: sma120Val,
         bbUpper: bb ? bb.upper[i] : null,
         bbMiddle: bb ? bb.middle[i] : null,
         bbLower: bb ? bb.lower[i] : null,
@@ -518,7 +519,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
         macdHist: macd ? macd.histogram[i] : null,
       };
     });
-  }, [rawData, indicators, subIndicators, needsDailySma200, dailySma200]);
+  }, [rawData, indicators, subIndicators, needsDailySma, dailySmaData]);
 
   // ─── 줌 적용된 가시 데이터 ──────────────────────────────
   const visibleData = useMemo(() => {
@@ -533,8 +534,8 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   // 골든/데드크로스 신호
   const crossSignals = useMemo(() => {
     if (!indicators.gcdc || rawData.length === 0) return [];
-    const short = calcSMA(rawData, 20);
-    const long = calcSMA(rawData, 50);
+    const short = calcSMA(rawData, 5);
+    const long = calcSMA(rawData, 20);
     return detectCrosses(short, long);
   }, [rawData, indicators.gcdc]);
 
@@ -849,9 +850,10 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
           <div className="flex flex-wrap gap-1">
             {(
               [
-                { key: "sma20", label: "SMA 20", color: "bg-yellow-400/20 text-yellow-400 border-yellow-400/30" },
-                { key: "sma50", label: "SMA 50", color: "bg-purple-400/20 text-purple-400 border-purple-400/30" },
-                { key: "sma200", label: "SMA 200", color: "bg-orange-400/20 text-orange-400 border-orange-400/30" },
+                { key: "sma5", label: "5일선", color: "bg-red-400/20 text-red-400 border-red-400/30" },
+                { key: "sma20", label: "20일선", color: "bg-yellow-400/20 text-yellow-400 border-yellow-400/30" },
+                { key: "sma60", label: "60일선", color: "bg-green-400/20 text-green-400 border-green-400/30" },
+                { key: "sma120", label: "120일선", color: "bg-purple-400/20 text-purple-400 border-purple-400/30" },
                 { key: "bb", label: "볼린저밴드", color: "bg-blue-400/20 text-blue-400 border-blue-400/30" },
                 { key: "gcdc", label: "GC/DC", color: "bg-pink-400/20 text-pink-400 border-pink-400/30" },
               ] as { key: keyof IndicatorSettings; label: string; color: string }[]
@@ -898,9 +900,10 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
 
       {/* 활성 지표 범례 */}
       <div className="flex flex-wrap gap-2 text-[10px] font-mono">
-        {indicators.sma20 && <span className="text-yellow-400">● SMA20</span>}
-        {indicators.sma50 && <span className="text-purple-400">● SMA50</span>}
-        {indicators.sma200 && <span className="text-orange-400">● SMA200</span>}
+        {indicators.sma5 && <span className="text-red-400">● 5일</span>}
+        {indicators.sma20 && <span className="text-yellow-400">● 20일</span>}
+        {indicators.sma60 && <span className="text-green-400">● 60일</span>}
+        {indicators.sma120 && <span className="text-purple-400">● 120일</span>}
         {indicators.bb && <span className="text-blue-400">● BB</span>}
         {indicators.gcdc && <span className="text-pink-400">● GC/DC</span>}
       </div>
@@ -990,15 +993,18 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
             </>
           )}
 
-          {/* SMA 라인 */}
+          {/* SMA 라인 (5, 20, 60, 120일) */}
+          {indicators.sma5 && (
+            <Line type="monotone" dataKey="sma5" stroke="#f87171" strokeWidth={1} dot={false} connectNulls />
+          )}
           {indicators.sma20 && (
             <Line type="monotone" dataKey="sma20" stroke="#facc15" strokeWidth={1} dot={false} connectNulls />
           )}
-          {indicators.sma50 && (
-            <Line type="monotone" dataKey="sma50" stroke="#a855f7" strokeWidth={1} dot={false} connectNulls />
+          {indicators.sma60 && (
+            <Line type="monotone" dataKey="sma60" stroke="#4ade80" strokeWidth={1} dot={false} connectNulls />
           )}
-          {indicators.sma200 && (
-            <Line type="monotone" dataKey="sma200" stroke="#f97316" strokeWidth={1} dot={false} connectNulls />
+          {indicators.sma120 && (
+            <Line type="monotone" dataKey="sma120" stroke="#a855f7" strokeWidth={1} dot={false} connectNulls />
           )}
 
           {/* 골든/데드크로스 마커 */}

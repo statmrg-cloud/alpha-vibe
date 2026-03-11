@@ -12,6 +12,7 @@ import AutoTradePanel from "@/components/autotrade/AutoTradePanel";
 import AlpacaAccountPanel from "@/components/data/AlpacaAccountPanel";
 import TradeModal from "@/components/trade/TradeModal";
 import RealTradeModal from "@/components/trade/RealTradeModal";
+import StockInfoPanel from "@/components/data/StockInfoPanel";
 
 const WATCHLIST_SYMBOLS = [
   { symbol: "AAPL", name: "Apple Inc." },
@@ -596,6 +597,9 @@ export default function DataPanel() {
             </div>
           </div>
         </Card>
+
+        {/* 종목 정보 (호가/시세/투자자/지표/뉴스) */}
+        <StockInfoPanel symbol={chartSymbol} />
 
         {/* 모의투자 포트폴리오 */}
         <Card className="bg-card border-border overflow-hidden">
