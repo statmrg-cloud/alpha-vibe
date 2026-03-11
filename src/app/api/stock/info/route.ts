@@ -63,8 +63,8 @@ interface StockInfoResponse {
 async function fetchKoreanStockInfo(symbol: string): Promise<StockInfoResponse> {
   const code = symbol.replace(/\.(KS|KQ)$/, "");
 
-  // 5개 API 병렬 호출
-  const [basicRes, integrationRes, investorRes, askbidRes, newsRes] =
+  // 5개 API 병렬 호출 (실제 네이버 모바일 API 엔드포인트)
+  const [basicRes, integrationRes, trendRes, askingPriceRes, newsRes] =
     await Promise.all([
       fetch(`https://m.stock.naver.com/api/stock/${code}/basic`, {
         headers: HEADERS,
@@ -74,15 +74,15 @@ async function fetchKoreanStockInfo(symbol: string): Promise<StockInfoResponse> 
         headers: HEADERS,
         cache: "no-store",
       }).catch(() => null),
-      fetch(`https://m.stock.naver.com/api/stock/${code}/investor`, {
+      fetch(`https://m.stock.naver.com/api/stock/${code}/trend`, {
         headers: HEADERS,
         cache: "no-store",
       }).catch(() => null),
-      fetch(`https://m.stock.naver.com/api/stock/${code}/askbid`, {
+      fetch(`https://m.stock.naver.com/api/stock/${code}/askingPrice`, {
         headers: HEADERS,
         cache: "no-store",
       }).catch(() => null),
-      fetch(`https://m.stock.naver.com/api/stock/${code}/news?pageSize=5`, {
+      fetch(`https://m.stock.naver.com/api/news/stock/${code}?pageSize=5`, {
         headers: HEADERS,
         cache: "no-store",
       }).catch(() => null),
@@ -98,216 +98,181 @@ async function fetchKoreanStockInfo(symbol: string): Promise<StockInfoResponse> 
     news: null,
   };
 
-  // 1) Basic → name + marketData
+  // 1) Basic → name + current price
+  let currentPrice: number | null = null;
   try {
     if (basicRes && basicRes.ok) {
       const basic = await basicRes.json();
       result.name = basic.stockName || basic.stockNameEng || code;
-      result.marketData = {
-        open: parseNaverNumber(basic.openPrice) || null,
-        close: parseNaverNumber(basic.closePrice) || null,
-        high: parseNaverNumber(basic.highPrice) || null,
-        low: parseNaverNumber(basic.lowPrice) || null,
-        volume: parseNaverNumber(basic.accumulatedTradingVolume) || null,
-        tradingValue: parseNaverNumber(basic.accumulatedTradingValue) || null,
-      };
+      currentPrice = parseNaverNumber(basic.closePrice) || null;
     }
   } catch (e) {
     console.warn(`[stock/info] basic parse error (${code}):`, e);
   }
 
-  // 2) Integration → metrics
+  // 2) Integration → marketData + metrics (totalInfos uses code-based lookup)
   try {
     if (integrationRes && integrationRes.ok) {
       const integration = await integrationRes.json();
-      const metrics: StockInfoResponse["metrics"] = {
-        marketCap: null,
-        dividendYield: null,
-        pbr: null,
-        per: null,
-        roe: null,
-        psr: null,
-        foreignOwnership: null,
-      };
 
-      // totalInfos: [{ key: "PER", value: "12.5" }, ...]
       if (integration?.totalInfos) {
-        const getVal = (key: string): string | null => {
+        const getByCode = (c: string): string | null => {
           const item = integration.totalInfos.find(
-            (i: { key: string; value: string }) => i.key === key
+            (i: { code: string; value: string }) => i.code === c
           );
           return item?.value ?? null;
         };
 
-        const perStr = getVal("PER");
-        const pbrStr = getVal("PBR");
-        const roeStr = getVal("ROE");
-        const psrStr = getVal("PSR");
-        const divStr = getVal("배당수익률");
-        const capStr = getVal("시총");
-        const foreignStr = getVal("외국인보유율") || getVal("외국인소진율");
+        // marketData from integration
+        result.marketData = {
+          open: parseNaverNumber(getByCode("openPrice")) || null,
+          close: currentPrice || parseNaverNumber(getByCode("lastClosePrice")) || null,
+          high: parseNaverNumber(getByCode("highPrice")) || null,
+          low: parseNaverNumber(getByCode("lowPrice")) || null,
+          volume: parseNaverNumber(getByCode("accumulatedTradingVolume")) || null,
+          tradingValue: null,
+        };
+        // 거래대금: "5,578,544백만" → parse
+        const tradingStr = getByCode("accumulatedTradingValue");
+        if (tradingStr) {
+          const numPart = parseFloat(tradingStr.replace(/[,백만억원\s]/g, ""));
+          if (tradingStr.includes("백만")) result.marketData.tradingValue = numPart * 1e6;
+          else if (tradingStr.includes("억")) result.marketData.tradingValue = numPart * 1e8;
+          else result.marketData.tradingValue = numPart;
+        }
 
-        if (perStr) metrics.per = parseFloat(perStr.replace(/[,%배]/g, "")) || null;
-        if (pbrStr) metrics.pbr = parseFloat(pbrStr.replace(/[,%배]/g, "")) || null;
-        if (roeStr) metrics.roe = parseFloat(roeStr.replace(/[,%배]/g, "")) || null;
-        if (psrStr) metrics.psr = parseFloat(psrStr.replace(/[,%배]/g, "")) || null;
+        // metrics
+        const metrics: StockInfoResponse["metrics"] = {
+          marketCap: null,
+          dividendYield: null,
+          pbr: null,
+          per: null,
+          roe: null,
+          psr: null,
+          foreignOwnership: null,
+        };
+
+        const perStr = getByCode("per");
+        const pbrStr = getByCode("pbr");
+        const divStr = getByCode("dividendYieldRatio");
+        const foreignStr = getByCode("foreignRate");
+        const capStr = getByCode("marketValue");
+
+        if (perStr) metrics.per = parseFloat(perStr.replace(/[,%배원\s]/g, "")) || null;
+        if (pbrStr) metrics.pbr = parseFloat(pbrStr.replace(/[,%배원\s]/g, "")) || null;
         if (divStr) metrics.dividendYield = parseFloat(divStr.replace(/[%]/g, "")) || null;
         if (foreignStr) metrics.foreignOwnership = parseFloat(foreignStr.replace(/[%]/g, "")) || null;
 
         if (capStr) {
-          const capNum = parseFloat(capStr.replace(/[,억원조\s]/g, ""));
-          if (capStr.includes("조")) metrics.marketCap = capNum * 1e12;
-          else if (capStr.includes("억")) metrics.marketCap = capNum * 1e8;
-          else metrics.marketCap = capNum;
+          // "1,150조 1,856억" → parse
+          let totalWon = 0;
+          const joMatch = capStr.match(/([\d,]+)조/);
+          const eokMatch = capStr.match(/([\d,]+)억/);
+          if (joMatch) totalWon += parseFloat(joMatch[1].replace(/,/g, "")) * 1e12;
+          if (eokMatch) totalWon += parseFloat(eokMatch[1].replace(/,/g, "")) * 1e8;
+          if (totalWon > 0) metrics.marketCap = totalWon;
         }
-      }
 
-      result.metrics = metrics;
+        result.metrics = metrics;
+      }
     }
   } catch (e) {
     console.warn(`[stock/info] integration parse error (${code}):`, e);
   }
 
-  // 3) Investor trends → investorTrends
+  // 3) Trend → investorTrends (순매수량 기반)
+  // API: /api/stock/{code}/trend → array of daily data
+  // Each item: { foreignerPureBuyQuant, organPureBuyQuant, individualPureBuyQuant, ... }
   try {
-    if (investorRes && investorRes.ok) {
-      const investorData = await investorRes.json();
-      // Naver investor API returns an array or object with investor categories
-      // Structure: { foreignInvestors, individuals, institutions } or similar
-      const trends: StockInfoResponse["investorTrends"] = {
-        individual: null,
-        foreign: null,
-        institution: null,
-      };
+    if (trendRes && trendRes.ok) {
+      const trendData = await trendRes.json();
 
-      // Try parsing common Naver investor response structures
-      if (Array.isArray(investorData)) {
-        // Array format: each element has investorType, buyAmount, sellAmount
-        for (const item of investorData) {
-          const buy = parseNaverNumber(item.buyTradingValue || item.buyAmount || item.purchaseAmount);
-          const sell = parseNaverNumber(item.sellTradingValue || item.sellAmount || item.saleAmount);
-          const type = item.investorType || item.investorName || "";
+      if (Array.isArray(trendData) && trendData.length > 0) {
+        // 가장 최근 데이터 (첫 번째)
+        const latest = trendData[0];
 
-          if (type.includes("개인") || type === "individual") {
-            trends.individual = { buy, sell };
-          } else if (type.includes("외국") || type.includes("외인") || type === "foreign") {
-            trends.foreign = { buy, sell };
-          } else if (type.includes("기관") || type === "institution") {
-            trends.institution = { buy, sell };
-          }
-        }
-      } else if (investorData?.investors) {
-        // Nested format
-        for (const item of investorData.investors) {
-          const buy = parseNaverNumber(item.buyTradingValue || item.buyAmount);
-          const sell = parseNaverNumber(item.sellTradingValue || item.sellAmount);
-          const type = item.investorType || item.investorName || "";
+        const foreignNet = parseNaverNumber(latest.foreignerPureBuyQuant);
+        const organNet = parseNaverNumber(latest.organPureBuyQuant);
+        const individualNet = parseNaverNumber(latest.individualPureBuyQuant);
 
-          if (type.includes("개인") || type === "individual") {
-            trends.individual = { buy, sell };
-          } else if (type.includes("외국") || type.includes("외인") || type === "foreign") {
-            trends.foreign = { buy, sell };
-          } else if (type.includes("기관") || type === "institution") {
-            trends.institution = { buy, sell };
-          }
-        }
+        result.investorTrends = {
+          individual: { buy: individualNet > 0 ? individualNet : 0, sell: individualNet < 0 ? Math.abs(individualNet) : 0 },
+          foreign: { buy: foreignNet > 0 ? foreignNet : 0, sell: foreignNet < 0 ? Math.abs(foreignNet) : 0 },
+          institution: { buy: organNet > 0 ? organNet : 0, sell: organNet < 0 ? Math.abs(organNet) : 0 },
+        };
       }
-
-      result.investorTrends = trends;
     }
   } catch (e) {
-    console.warn(`[stock/info] investor parse error (${code}):`, e);
+    console.warn(`[stock/info] trend parse error (${code}):`, e);
   }
 
-  // 4) Ask/bid → orderBook
+  // 4) AskingPrice → orderBook (호가)
+  // API: /api/stock/{code}/askingPrice
+  // { sellInfo: [{price, count, rate}], buyInfos: [{price, count, rate}] }
   try {
-    if (askbidRes && askbidRes.ok) {
-      const askbidData = await askbidRes.json();
+    if (askingPriceRes && askingPriceRes.ok) {
+      const hoga = await askingPriceRes.json();
       const asks: OrderBookEntry[] = [];
       const bids: OrderBookEntry[] = [];
 
-      // Naver askbid API typically returns askPrices/bidPrices or similar arrays
-      if (askbidData?.askPrices && askbidData?.bidPrices) {
-        for (const item of askbidData.askPrices.slice(0, 5)) {
+      if (hoga?.sellInfo) {
+        for (const item of hoga.sellInfo.slice(0, 5)) {
           asks.push({
             price: parseNaverNumber(item.price),
-            quantity: parseNaverNumber(item.quantity || item.count),
+            quantity: parseNaverNumber(item.count),
           });
         }
-        for (const item of askbidData.bidPrices.slice(0, 5)) {
+      }
+      if (hoga?.buyInfos) {
+        for (const item of hoga.buyInfos.slice(0, 5)) {
           bids.push({
             price: parseNaverNumber(item.price),
-            quantity: parseNaverNumber(item.quantity || item.count),
+            quantity: parseNaverNumber(item.count),
           });
-        }
-      } else if (Array.isArray(askbidData)) {
-        // Flat array format with type indicator
-        for (const item of askbidData) {
-          const entry: OrderBookEntry = {
-            price: parseNaverNumber(item.price),
-            quantity: parseNaverNumber(item.quantity || item.count || item.residualCount),
-          };
-          if (item.type === "ask" || item.type === "매도") {
-            if (asks.length < 5) asks.push(entry);
-          } else if (item.type === "bid" || item.type === "매수") {
-            if (bids.length < 5) bids.push(entry);
-          }
-        }
-      } else if (askbidData?.askTotalRemainingCount !== undefined) {
-        // Another common Naver format with numbered fields (askPrice1, askPrice2, ...)
-        for (let i = 1; i <= 5; i++) {
-          const askPrice = parseNaverNumber(askbidData[`askPrice${i}`]);
-          const askQty = parseNaverNumber(
-            askbidData[`askRemainingCount${i}`] || askbidData[`askCount${i}`]
-          );
-          if (askPrice) asks.push({ price: askPrice, quantity: askQty });
-
-          const bidPrice = parseNaverNumber(askbidData[`bidPrice${i}`]);
-          const bidQty = parseNaverNumber(
-            askbidData[`bidRemainingCount${i}`] || askbidData[`bidCount${i}`]
-          );
-          if (bidPrice) bids.push({ price: bidPrice, quantity: bidQty });
         }
       }
 
       result.orderBook = { asks, bids };
     }
   } catch (e) {
-    console.warn(`[stock/info] askbid parse error (${code}):`, e);
+    console.warn(`[stock/info] askingPrice parse error (${code}):`, e);
   }
 
   // 5) News
+  // API: /api/news/stock/{code}?pageSize=5
+  // Returns array of { total, items: [{ officeId, articleId, title, titleFull, datetime, ... }] }
   try {
     if (newsRes && newsRes.ok) {
       const newsData = await newsRes.json();
       const articles: Array<{ title: string; url: string; date: string }> = [];
 
-      // Naver news API returns items in various shapes
-      const newsList =
-        newsData?.items || newsData?.news || (Array.isArray(newsData) ? newsData : []);
+      if (Array.isArray(newsData)) {
+        for (const group of newsData) {
+          if (group?.items && Array.isArray(group.items)) {
+            for (const item of group.items) {
+              if (articles.length >= 5) break;
+              const title = item.titleFull || item.title || "";
+              const officeId = item.officeId || "";
+              const articleId = item.articleId || "";
+              const url = officeId && articleId
+                ? `https://n.news.naver.com/mnews/article/${officeId}/${articleId}`
+                : "";
+              const datetime = item.datetime || "";
+              // datetime format: "202603111352" → "2026-03-11 13:52"
+              let dateStr = datetime;
+              if (datetime.length >= 12) {
+                dateStr = `${datetime.slice(0, 4)}-${datetime.slice(4, 6)}-${datetime.slice(6, 8)} ${datetime.slice(8, 10)}:${datetime.slice(10, 12)}`;
+              }
 
-      for (const item of newsList.slice(0, 5)) {
-        const title = item.title || item.articleTitle || "";
-        const url =
-          item.url ||
-          item.link ||
-          item.articleLink ||
-          (item.oid && item.aid
-            ? `https://n.news.naver.com/mnews/article/${item.oid}/${item.aid}`
-            : "");
-        const date =
-          item.date ||
-          item.publishedAt ||
-          item.datetime ||
-          item.registeredDate ||
-          "";
-
-        if (title) {
-          articles.push({
-            title: title.replace(/<[^>]*>/g, ""), // strip HTML tags
-            url,
-            date: formatDate(date),
-          });
+              if (title) {
+                articles.push({
+                  title: title.replace(/<[^>]*>/g, ""),
+                  url,
+                  date: dateStr,
+                });
+              }
+            }
+          }
         }
       }
 
@@ -407,23 +372,6 @@ function extractYahooRaw(field: unknown): number | null {
     if (typeof raw === "number") return raw;
   }
   return null;
-}
-
-// Format date string to YYYY-MM-DD
-function formatDate(dateStr: string): string {
-  if (!dateStr) return "";
-  try {
-    // Already in YYYY-MM-DD format
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-    // Try parsing as Date
-    const d = new Date(dateStr);
-    if (!isNaN(d.getTime())) {
-      return d.toISOString().split("T")[0];
-    }
-  } catch {
-    // ignore
-  }
-  return dateStr;
 }
 
 // ─── API Handler ───

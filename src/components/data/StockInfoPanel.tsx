@@ -160,25 +160,29 @@ export default function StockInfoPanel({ symbol }: StockInfoPanelProps) {
   const renderInvestor = () => {
     const it = info?.investorTrends;
     if (!it) return <div className="text-xs text-slate-400 text-center py-3">투자자 데이터 없음{!isKR && " (한국주식만 지원)"}</div>;
+
     const rows = [
-      { label: "개인", ...it.individual },
-      { label: "외국인", ...it.foreign },
-      { label: "기관", ...it.institution },
+      { label: "개인", data: it.individual },
+      { label: "외국인", data: it.foreign },
+      { label: "기관", data: it.institution },
     ];
+
     return (
       <div className="space-y-1.5">
-        <div className="grid grid-cols-4 text-[11px] font-mono text-slate-400 px-1">
-          <span></span><span className="text-right">매수</span><span className="text-right">매도</span><span className="text-right">순매수</span>
+        <div className="grid grid-cols-3 text-[11px] font-mono text-slate-400 px-1">
+          <span></span><span className="text-right">순매수(주)</span><span className="text-right">방향</span>
         </div>
         {rows.map((r) => {
-          const net = r.buy - r.sell;
+          if (!r.data) return null;
+          const net = r.data.buy - r.data.sell;
           return (
-            <div key={r.label} className="grid grid-cols-4 text-xs font-mono px-1">
+            <div key={r.label} className="grid grid-cols-3 text-xs font-mono px-1 items-center">
               <span className="text-slate-300">{r.label}</span>
-              <span className="text-right text-red-400">{fmtNum(r.buy)}</span>
-              <span className="text-right text-blue-400">{fmtNum(r.sell)}</span>
-              <span className={`text-right font-medium ${net >= 0 ? "text-up" : "text-down"}`}>
-                {net >= 0 ? "+" : ""}{fmtNum(net)}
+              <span className={`text-right font-medium ${net > 0 ? "text-up" : net < 0 ? "text-down" : "text-slate-400"}`}>
+                {net > 0 ? "+" : ""}{fmtNum(net)}
+              </span>
+              <span className={`text-right text-[11px] ${net > 0 ? "text-up" : net < 0 ? "text-down" : "text-slate-400"}`}>
+                {net > 0 ? "매수 우위" : net < 0 ? "매도 우위" : "-"}
               </span>
             </div>
           );
