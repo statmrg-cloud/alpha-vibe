@@ -14,7 +14,7 @@ import TradeModal from "@/components/trade/TradeModal";
 import RealTradeModal from "@/components/trade/RealTradeModal";
 import StockInfoPanel from "@/components/data/StockInfoPanel";
 
-const WATCHLIST_SYMBOLS = [
+const DEFAULT_WATCHLIST = [
   { symbol: "AAPL", name: "Apple Inc." },
   { symbol: "NVDA", name: "NVIDIA Corp." },
   { symbol: "MSFT", name: "Microsoft" },
@@ -23,12 +23,42 @@ const WATCHLIST_SYMBOLS = [
   { symbol: "035720.KS", name: "카카오" },
 ];
 
+function loadWatchlistSymbols(): Array<{ symbol: string; name: string }> {
+  if (typeof window === "undefined") return DEFAULT_WATCHLIST;
+  try {
+    const saved = localStorage.getItem("alpha-vibe-watchlist");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_WATCHLIST;
+}
+
 interface WatchlistData {
   symbol: string;
   name: string;
   price: number;
   changePercent: number;
   loading: boolean;
+}
+
+interface PriceAlert {
+  symbol: string;
+  name: string;
+  targetPrice: number;
+  direction: "above" | "below";
+  enabled: boolean;
+  triggered: boolean;
+}
+
+function loadPriceAlerts(): PriceAlert[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const saved = localStorage.getItem("alpha-vibe-price-alerts");
+    if (saved) return JSON.parse(saved);
+  } catch { /* ignore */ }
+  return [];
 }
 
 interface TradeModalState {
@@ -116,9 +146,13 @@ export default function DataPanel() {
   const [suggestions, setSuggestions] = useState<Array<{ name: string; symbol: string }>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
+  const [watchlistSymbols, setWatchlistSymbols] = useState<Array<{ symbol: string; name: string }>>(loadWatchlistSymbols);
   const [watchlist, setWatchlist] = useState<WatchlistData[]>(
-    WATCHLIST_SYMBOLS.map((w) => ({ ...w, price: 0, changePercent: 0, loading: true }))
+    loadWatchlistSymbols().map((w) => ({ ...w, price: 0, changePercent: 0, loading: true }))
   );
+  const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>(loadPriceAlerts);
+  const [alertInput, setAlertInput] = useState("");
+  const [alertDirection, setAlertDirection] = useState<"below" | "above">("below");
   const [holdingPrices, setHoldingPrices] = useState<Record<string, number>>({});
   const [tradeModal, setTradeModal] = useState<TradeModalState | null>(null);
   const [realTradeModal, setRealTradeModal] = useState<RealTradeModalState | null>(null);
@@ -315,8 +349,34 @@ export default function DataPanel() {
     }, 300);
   };
 
-  const handleSelectSuggestion = (symbol: string) => {
+  // 관심종목에 자동 추가
+  const addToWatchlist = useCallback((symbol: string, name?: string) => {
+    setWatchlistSymbols((prev) => {
+      if (prev.find((w) => w.symbol === symbol)) return prev;
+      const stockName = name || getStockName(symbol) || symbol;
+      const updated = [...prev, { symbol, name: stockName }];
+      localStorage.setItem("alpha-vibe-watchlist", JSON.stringify(updated));
+      // watchlist 데이터에도 즉시 추가
+      setWatchlist((wl) => [
+        ...wl,
+        { symbol, name: stockName, price: 0, changePercent: 0, loading: true },
+      ]);
+      return updated;
+    });
+  }, []);
+
+  const removeFromWatchlist = useCallback((symbol: string) => {
+    setWatchlistSymbols((prev) => {
+      const updated = prev.filter((w) => w.symbol !== symbol);
+      localStorage.setItem("alpha-vibe-watchlist", JSON.stringify(updated));
+      setWatchlist((wl) => wl.filter((w) => w.symbol !== symbol));
+      return updated;
+    });
+  }, []);
+
+  const handleSelectSuggestion = (symbol: string, name?: string) => {
     setChartSymbol(symbol);
+    addToWatchlist(symbol, name);
     setSymbolInput("");
     setSuggestions([]);
     setShowSuggestions(false);
@@ -327,6 +387,9 @@ export default function DataPanel() {
     const q = symbolInput.trim();
     if (!q) return;
 
+    let targetSymbol = q.toUpperCase();
+    let targetName = "";
+
     // 로컬 DB에서 정확히 매칭
     const exact = STOCK_SEARCH_DB.find(
       (item) =>
@@ -334,23 +397,46 @@ export default function DataPanel() {
         item.keywords.some((kw) => kw === q.toLowerCase())
     );
     if (exact) {
-      setChartSymbol(exact.symbol);
+      targetSymbol = exact.symbol;
+      targetName = exact.name;
     } else if (/^\d{6}$/.test(q)) {
-      // 6자리 숫자 → 한국 종목코드 (자동으로 .KS 추가)
-      setChartSymbol(`${q}.KS`);
-    } else {
-      // 그 외: 직접 심볼로 사용 (AAPL, TSLA, SPY 등)
-      setChartSymbol(q.toUpperCase());
+      targetSymbol = `${q}.KS`;
     }
+
+    setChartSymbol(targetSymbol);
+    addToWatchlist(targetSymbol, targetName);
     setSymbolInput("");
     setSuggestions([]);
     setShowSuggestions(false);
   };
 
+  // 가격 알림 추가
+  const addPriceAlert = () => {
+    const price = parseFloat(alertInput);
+    if (!price || price <= 0) return;
+    const name = getStockName(chartSymbol) || chartSymbol;
+    setPriceAlerts((prev) => {
+      const updated = [...prev, { symbol: chartSymbol, name, targetPrice: price, direction: alertDirection, enabled: true, triggered: false }];
+      localStorage.setItem("alpha-vibe-price-alerts", JSON.stringify(updated));
+      return updated;
+    });
+    setAlertInput("");
+  };
+
+  const removePriceAlert = (idx: number) => {
+    setPriceAlerts((prev) => {
+      const updated = prev.filter((_, i) => i !== idx);
+      localStorage.setItem("alpha-vibe-price-alerts", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   // 실시간 워치리스트 데이터 fetch
   const fetchWatchlistData = useCallback(async () => {
+    const symbols = watchlistSymbols;
+    if (symbols.length === 0) return;
     const updated = await Promise.all(
-      WATCHLIST_SYMBOLS.map(async (item) => {
+      symbols.map(async (item) => {
         try {
           const res = await fetch(`/api/stock?symbol=${encodeURIComponent(item.symbol)}&lite=true`);
           if (!res.ok) return { ...item, price: 0, changePercent: 0, loading: false };
@@ -368,13 +454,49 @@ export default function DataPanel() {
       })
     );
     setWatchlist(updated);
-  }, []);
+
+    // 가격 알림 체크
+    setPriceAlerts((prev) => {
+      let changed = false;
+      const newAlerts = prev.map((alert) => {
+        if (!alert.enabled || alert.triggered) return alert;
+        const stock = updated.find((s) => s.symbol === alert.symbol);
+        if (!stock || stock.price <= 0) return alert;
+        const hit = alert.direction === "below"
+          ? stock.price <= alert.targetPrice
+          : stock.price >= alert.targetPrice;
+        if (hit) {
+          changed = true;
+          const isKR = alert.symbol.endsWith(".KS") || alert.symbol.endsWith(".KQ");
+          const priceStr = isKR ? stock.price.toLocaleString() : `$${stock.price.toFixed(2)}`;
+          const dirLabel = alert.direction === "below" ? "이하 도달" : "이상 도달";
+          // 브라우저 알림
+          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+            new Notification(`${alert.name} 가격 알림`, { body: `현재가 ${priceStr} — 목표가 ${dirLabel}`, icon: "/favicon.ico" });
+          }
+          // fallback alert
+          try { window.alert(`[가격 알림] ${alert.name}\n현재가: ${priceStr}\n${dirLabel}`); } catch { /* ignore */ }
+          return { ...alert, triggered: true };
+        }
+        return alert;
+      });
+      if (changed) localStorage.setItem("alpha-vibe-price-alerts", JSON.stringify(newAlerts));
+      return changed ? newAlerts : prev;
+    });
+  }, [watchlistSymbols]);
 
   useEffect(() => {
     fetchWatchlistData();
-    const interval = setInterval(fetchWatchlistData, 5000);  // 5초마다 관심종목 갱신 (lite 모드)
+    const interval = setInterval(fetchWatchlistData, 5000);
     return () => clearInterval(interval);
   }, [fetchWatchlistData]);
+
+  // 브라우저 알림 권한 요청
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   const totalInvested = portfolio.holdings.reduce(
     (sum, h) => sum + h.totalInvested,
@@ -458,7 +580,7 @@ export default function DataPanel() {
                       } else if (e.key === "Enter") {
                         e.preventDefault();
                         if (selectedIdx >= 0 && selectedIdx < suggestions.length) {
-                          handleSelectSuggestion(suggestions[selectedIdx].symbol);
+                          handleSelectSuggestion(suggestions[selectedIdx].symbol, suggestions[selectedIdx].name);
                         } else {
                           handleSymbolSearch();
                         }
@@ -488,7 +610,7 @@ export default function DataPanel() {
                   {suggestions.map((item, idx) => (
                     <button
                       key={item.symbol}
-                      onMouseDown={() => handleSelectSuggestion(item.symbol)}
+                      onMouseDown={() => handleSelectSuggestion(item.symbol, item.name)}
                       onMouseEnter={() => setSelectedIdx(idx)}
                       className={`w-full flex items-center justify-between px-2 py-1.5 transition-colors text-left ${
                         idx === selectedIdx
@@ -924,6 +1046,79 @@ export default function DataPanel() {
           </div>
         </Card>
 
+        {/* 가격 알림 */}
+        <Card className="bg-card border-border overflow-hidden">
+          <div className="px-3 pt-3 pb-1">
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="w-1 h-3 rounded-full bg-yellow-500" />
+              <span className="text-xs font-mono text-cyan-500 tracking-wider">
+                PRICE ALERT
+              </span>
+              <span className="text-[10px] font-mono text-slate-400 ml-auto">
+                {priceAlerts.filter((a) => a.enabled && !a.triggered).length}개 활성
+              </span>
+            </div>
+            <div className="flex gap-1 mb-2">
+              <select
+                value={alertDirection}
+                onChange={(e) => setAlertDirection(e.target.value as "below" | "above")}
+                className="h-6 text-[11px] font-mono bg-secondary/60 border border-border/50 rounded px-1 text-foreground"
+              >
+                <option value="below">이하</option>
+                <option value="above">이상</option>
+              </select>
+              <input
+                type="number"
+                value={alertInput}
+                onChange={(e) => setAlertInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addPriceAlert(); }}
+                placeholder={`${getStockName(chartSymbol) || chartSymbol} 목표가`}
+                className="flex-1 h-6 text-[11px] font-mono bg-secondary/60 border border-border/50 rounded px-2 text-foreground placeholder:text-slate-400 focus:outline-none focus:border-yellow-500/40"
+              />
+              <button
+                onClick={addPriceAlert}
+                className="text-[10px] font-mono px-2 h-6 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20 transition-all"
+              >
+                추가
+              </button>
+            </div>
+          </div>
+          <div className="px-3 pb-3">
+            {priceAlerts.length === 0 ? (
+              <div className="text-xs font-mono text-slate-400 py-2 text-center border border-dashed border-border/50 rounded">
+                가격 알림 없음 — 목표가를 설정하세요
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {priceAlerts.map((alert, idx) => {
+                  const isKR = alert.symbol.endsWith(".KS") || alert.symbol.endsWith(".KQ");
+                  return (
+                    <div key={idx} className={`flex items-center justify-between text-xs font-mono px-1.5 py-1 rounded ${alert.triggered ? "bg-yellow-500/10 border border-yellow-500/20" : "hover:bg-secondary/30"}`}>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className={`shrink-0 ${alert.triggered ? "text-yellow-400" : "text-slate-300"}`}>
+                          {alert.triggered ? "✓" : "●"}
+                        </span>
+                        <span className="truncate text-slate-200">{alert.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-yellow-400">
+                          {alert.direction === "below" ? "≤" : "≥"} {isKR ? alert.targetPrice.toLocaleString() : `$${alert.targetPrice.toFixed(2)}`}
+                        </span>
+                        <button
+                          onClick={() => removePriceAlert(idx)}
+                          className="text-slate-500 hover:text-red-400 transition-colors text-[10px]"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </Card>
+
         {/* 관심종목 (실시간) */}
         <Card className="bg-card border-border overflow-hidden">
           <div className="px-3 pt-3 pb-1">
@@ -932,7 +1127,7 @@ export default function DataPanel() {
               <span className="text-xs font-mono text-cyan-500 tracking-wider">
                 WATCHLIST
               </span>
-              <span className="text-[10px] font-mono text-slate-400 ml-auto">LIVE</span>
+              <span className="text-[10px] font-mono text-slate-400 ml-auto">{watchlist.length}종목 · LIVE</span>
             </div>
           </div>
           <div className="px-3 pb-3">
@@ -943,16 +1138,15 @@ export default function DataPanel() {
                 return (
                 <div
                   key={stock.symbol}
-                  onClick={() => setChartSymbol(stock.symbol)}
                   className="flex items-center justify-between py-1.5 px-2 -mx-2 hover:bg-secondary/50 rounded cursor-pointer transition-all group"
                 >
-                  <div className="font-mono">
+                  <div className="font-mono flex-1 min-w-0" onClick={() => setChartSymbol(stock.symbol)}>
                     <div className={`text-xs font-bold group-hover:text-primary transition-colors ${isKR ? "text-yellow-400" : "text-sky-400"}`}>
                       {stockName}
                     </div>
                     <div className="text-[11px] text-foreground/70 font-medium">{stock.symbol}</div>
                   </div>
-                  <div className="text-right font-mono">
+                  <div className="text-right font-mono" onClick={() => setChartSymbol(stock.symbol)}>
                     {stock.loading ? (
                       <div className="text-xs text-slate-400 animate-pulse">로딩...</div>
                     ) : (
@@ -966,6 +1160,13 @@ export default function DataPanel() {
                       </>
                     )}
                   </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeFromWatchlist(stock.symbol); }}
+                    className="ml-1 text-[10px] text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                    title="관심종목에서 제거"
+                  >
+                    ✕
+                  </button>
                 </div>
               );
               })}
