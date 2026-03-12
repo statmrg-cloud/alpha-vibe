@@ -24,6 +24,7 @@ import {
   calcBollingerBands,
   detectCrosses,
 } from "@/lib/chart/indicators";
+import ChartDrawingOverlay from "@/components/chart/ChartDrawingOverlay";
 
 // ─── 타입 ─────────────────────────────────────────────
 interface LivePrice {
@@ -197,6 +198,59 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   const [chartType, setChartType] = useState<ChartType>("candle");
   const [subIndicators, setSubIndicators] = useState<Set<SubIndicator>>(() => new Set<SubIndicator>(["volume"]));
   const [showSettings, setShowSettings] = useState(false);
+
+  // 전체화면 & 그리기 모드
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenHeight, setFullscreenHeight] = useState(500);
+  const [drawingMode, setDrawingMode] = useState(false);
+  const fullscreenRef = useRef<HTMLDivElement>(null);
+  const chartAreaRef = useRef<HTMLDivElement>(null);
+  const [chartDimensions, setChartDimensions] = useState({ width: 0, height: 0 });
+
+  // 전체화면 높이 리사이즈 드래그
+  const fsResizingRef = useRef<{ startY: number; startH: number } | null>(null);
+
+  useEffect(() => {
+    const handleFsResizeMove = (e: MouseEvent) => {
+      if (!fsResizingRef.current) return;
+      e.preventDefault();
+      const delta = e.clientY - fsResizingRef.current.startY;
+      const newH = Math.max(300, Math.min(window.innerHeight - 100, fsResizingRef.current.startH + delta));
+      setFullscreenHeight(newH);
+    };
+    const handleFsResizeUp = () => { fsResizingRef.current = null; };
+    document.addEventListener("mousemove", handleFsResizeMove);
+    document.addEventListener("mouseup", handleFsResizeUp);
+    return () => {
+      document.removeEventListener("mousemove", handleFsResizeMove);
+      document.removeEventListener("mouseup", handleFsResizeUp);
+    };
+  }, []);
+
+  // ESC로 전체화면 & 그리기 모드 해제
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (drawingMode) setDrawingMode(false);
+        else if (isFullscreen) setIsFullscreen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen, drawingMode]);
+
+  // 차트 영역 크기 추적 (그리기 오버레이용)
+  useEffect(() => {
+    const el = chartAreaRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setChartDimensions({ width: entry.contentRect.width, height: entry.contentRect.height });
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isFullscreen]);
 
   // 줌 상태: 전체 데이터 중 보여줄 범위 (0~1 비율)
   // 기본값: 최근 1/3만 표시 (나머지 2/3는 오른쪽 드래그로 과거 탐색 가능)
@@ -405,6 +459,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
     if (loading) return;
 
     const handleMouseDown = (e: MouseEvent) => {
+      if (drawingMode) return; // 그리기 모드일 때 드래그 패닝 비활성화
       const container = chartContainerRef.current;
       if (!container) return;
       const target = e.target as Node;
@@ -765,13 +820,16 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
 
   const orderedSubIndicators: SubIndicator[] = ["volume", "cci", "rsi", "macd"];
 
+  // ─── 메인 차트 높이 (전체화면 시 가변) ──────────────
+  const mainChartHeight = isFullscreen ? fullscreenHeight : 220;
+
   // ─── 메인 렌더 ──────────────────────────────────────
-  return (
+  const chartContent = (
     <div className="space-y-1">
       {/* 헤더: 종목 + 현재가 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs font-bold text-primary">{symbol}</span>
+          <span className={`font-mono ${isFullscreen ? "text-sm" : "text-xs"} font-bold text-primary`}>{symbol}</span>
           {(() => {
             const korName = TICKER_TO_KOREAN_NAME[symbol];
             const displayName = korName || livePrice?.name;
@@ -839,6 +897,32 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
             }`}
           >
             ⚙
+          </button>
+          <div className="w-px h-4 bg-border/50 shrink-0" />
+          <button
+            onClick={() => setDrawingMode(!drawingMode)}
+            className={`px-1.5 py-0.5 text-[11px] font-mono rounded transition-colors whitespace-nowrap ${
+              drawingMode
+                ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                : "text-slate-400 hover:text-foreground hover:bg-secondary"
+            }`}
+            title="그리기 도구"
+          >
+            ✏ 그리기
+          </button>
+          <button
+            onClick={() => {
+              setIsFullscreen(!isFullscreen);
+              if (!isFullscreen) setFullscreenHeight(Math.min(window.innerHeight - 150, 600));
+            }}
+            className={`px-1.5 py-0.5 text-[11px] font-mono rounded transition-colors whitespace-nowrap ${
+              isFullscreen
+                ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
+                : "text-slate-400 hover:text-foreground hover:bg-secondary"
+            }`}
+            title={isFullscreen ? "원래 크기로 (ESC)" : "전체화면"}
+          >
+            {isFullscreen ? "✕ 축소" : "⛶ 확대"}
           </button>
         </div>
       </div>
@@ -941,8 +1025,15 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
       </div>
 
       {/* 메인 캔들/라인 차트 */}
-      <div ref={chartContainerRef} className={isDragging ? "cursor-grabbing" : "cursor-grab"} style={{ touchAction: "none", overscrollBehavior: "contain", userSelect: "none" }}>
-      <ResponsiveContainer width="100%" height={220}>
+      <div ref={(el) => { (chartContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el; (chartAreaRef as React.MutableRefObject<HTMLDivElement | null>).current = el; }} className={`relative ${drawingMode ? "cursor-crosshair" : isDragging ? "cursor-grabbing" : "cursor-grab"}`} style={{ touchAction: "none", overscrollBehavior: "contain", userSelect: "none" }}>
+      {drawingMode && (
+        <ChartDrawingOverlay
+          active={drawingMode}
+          width={chartDimensions.width || 400}
+          height={mainChartHeight}
+        />
+      )}
+      <ResponsiveContainer width="100%" height={mainChartHeight}>
         <ComposedChart data={visibleData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
           <XAxis
@@ -1040,6 +1131,56 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
       {orderedSubIndicators
         .filter((key) => subIndicators.has(key))
         .map((key) => SUB_RENDER_MAP[key]())}
+
+      {/* 전체화면 리사이즈 핸들 */}
+      {isFullscreen && (
+        <div
+          className="h-2 cursor-ns-resize group flex items-center justify-center hover:bg-primary/10 rounded transition-colors mt-1"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fsResizingRef.current = { startY: e.clientY, startH: fullscreenHeight };
+          }}
+        >
+          <div className="w-16 h-0.5 bg-slate-600 group-hover:bg-primary/50 rounded-full transition-colors" />
+        </div>
+      )}
     </div>
   );
+
+  // ─── 전체화면 래퍼 ──────────────────────────────────
+  if (isFullscreen) {
+    return (
+      <div
+        ref={fullscreenRef}
+        className="fixed inset-0 z-[100] bg-background/98 backdrop-blur-sm overflow-auto"
+        style={{ padding: "12px 16px" }}
+      >
+        {/* 전체화면 상단 바 */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm font-bold text-primary">{symbol}</span>
+            <span className="text-xs font-mono text-slate-400">전체화면</span>
+            {drawingMode && (
+              <span className="text-[10px] font-mono text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded px-1.5 py-0.5">
+                그리기 모드 ON
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] font-mono text-slate-500">ESC로 닫기 | 하단 드래그로 크기 조절</span>
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="px-2 py-0.5 text-xs font-mono rounded bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
+            >
+              ✕ 닫기
+            </button>
+          </div>
+        </div>
+        {chartContent}
+      </div>
+    );
+  }
+
+  return chartContent;
 }
