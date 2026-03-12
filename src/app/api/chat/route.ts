@@ -311,6 +311,11 @@ const TICKER_TO_KOREAN_NAME: Record<string, string> = {
   "247540.KS": "에코프로비엠",
   "086520.KS": "에코프로",
   "042700.KS": "한미반도체",
+  "085620.KS": "미래에셋생명",
+  "003190.KS": "대원강업",  // 서울식품은 004410.KS
+  "004410.KS": "서울식품",
+  "004415.KS": "서울식품우",
+  "039490.KS": "키움증권",
 };
 
 // 한글 종목명 → 티커 매핑 (주요 종목)
@@ -357,20 +362,78 @@ const KOREAN_STOCK_MAP: Record<string, string> = {
   에코프로비엠: "247540.KS",
   에코프로: "086520.KS",
   한미반도체: "042700.KS",
+  미래에셋생명: "085620.KS",
+  서울식품: "004410.KS",
+  서울식품공업: "004410.KS",
+  키움증권: "039490.KS",
 };
 
+// 네이버 자동완성 API로 한글 종목명 → 종목코드 변환
+async function resolveKoreanStockName(name: string): Promise<string | null> {
+  try {
+    const url = `https://ac.stock.naver.com/ac?q=${encodeURIComponent(name)}&target=stock`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const first = data?.items?.find(
+      (item: Record<string, string>) => item.nationCode === "KOR" && item.category === "stock"
+    );
+    if (first?.code) {
+      const ext = first.typeCode === "KOSDAQ" ? "KQ" : "KS";
+      return `${first.code}.${ext}`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // 사용자 메시지에서 종목 심볼 추출
-function extractSymbols(message: string): string[] {
+async function extractSymbols(message: string): Promise<string[]> {
   const symbols: string[] = [];
 
-  // 1. 한글 종목명 매칭
-  for (const [name, ticker] of Object.entries(KOREAN_STOCK_MAP)) {
-    if (message.includes(name)) {
-      symbols.push(ticker);
+  // 1. 한글 종목명 매칭 — 긴 이름 먼저 매칭 (미래에셋생명 > 미래에셋)
+  const sortedNames = Object.entries(KOREAN_STOCK_MAP)
+    .sort((a, b) => b[0].length - a[0].length);
+  const matchedRanges: [number, number][] = [];
+
+  for (const [name, ticker] of sortedNames) {
+    const idx = message.indexOf(name);
+    if (idx === -1) continue;
+    // 이미 더 긴 이름으로 매칭된 범위와 겹치면 스킵
+    const overlaps = matchedRanges.some(
+      ([start, end]) => idx < end && idx + name.length > start
+    );
+    if (overlaps) continue;
+    symbols.push(ticker);
+    matchedRanges.push([idx, idx + name.length]);
+  }
+
+  // 2. 한글 키워드가 하드코딩 맵에 없으면 네이버 자동완성으로 검색
+  // 메시지에서 한글 종목명 후보 추출 (2~10글자 한글 단어)
+  const koreanWords = message.match(/[가-힣]{2,10}/g) || [];
+  for (const word of koreanWords) {
+    // 이미 매칭된 범위에 포함되면 스킵
+    const wordIdx = message.indexOf(word);
+    const alreadyMatched = matchedRanges.some(
+      ([start, end]) => wordIdx >= start && wordIdx + word.length <= end
+    );
+    if (alreadyMatched) continue;
+    // 분석, 매수, 매도 등 동사/일반어 제외
+    const excludeWords = ["분석", "매수", "매도", "추천", "어때", "전망", "리포트", "투자", "수익", "하락", "상승", "시장", "종목"];
+    if (excludeWords.includes(word)) continue;
+    // 네이버 자동완성으로 종목코드 조회
+    const resolved = await resolveKoreanStockName(word);
+    if (resolved && !symbols.includes(resolved)) {
+      symbols.push(resolved);
+      matchedRanges.push([wordIdx, wordIdx + word.length]);
     }
   }
 
-  // 2. 영문 티커 매칭 (대문자 1~5글자, $ 접두사 포함)
+  // 3. 영문 티커 매칭 (대문자 1~5글자, $ 접두사 포함)
   const tickerPattern = /\$?([A-Z]{1,5})(?:\s|$|[,.])/g;
   let match;
   while ((match = tickerPattern.exec(message.toUpperCase())) !== null) {
@@ -479,8 +542,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. 메시지에서 종목 심볼 추출
-    const symbols = extractSymbols(message);
+    // 1. 메시지에서 종목 심볼 추출 (네이버 자동완성 API 포함)
+    const symbols = await extractSymbols(message);
 
     // 2. 종목 데이터 + 시장 개요 데이터 조회
     let stockContext = "";
