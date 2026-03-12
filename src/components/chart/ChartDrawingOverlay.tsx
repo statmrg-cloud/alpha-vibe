@@ -88,52 +88,79 @@ const TOOLS: { key: DrawingTool; label: string; icon: string }[] = [
 // ─── 컴포넌트 ─────────────────────────────────────────
 export default function ChartDrawingOverlay({ active, width, height }: ChartDrawingOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // 도구 설정 (UI 반영 필요 → state)
   const [tool, setTool] = useState<DrawingTool>("trendline");
   const [color, setColor] = useState("#ef4444");
   const [lineWidth, setLineWidth] = useState(2);
   const [lineStyle, setLineStyle] = useState<"solid" | "dashed" | "dotted">("solid");
-  const [drawings, setDrawings] = useState<Drawing[]>([]);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [startPoint, setStartPoint] = useState<Point | null>(null);
-  const [currentPoint, setCurrentPoint] = useState<Point | null>(null);
-  const [freehandPoints, setFreehandPoints] = useState<Point[]>([]);
+  const [customColor, setCustomColor] = useState("#ef4444");
+  const [fontSize, setFontSize] = useState(14);
+  const [showToolbar, setShowToolbar] = useState(true);
+  const [drawingCount, setDrawingCount] = useState(0);
+
+  // 텍스트 입력 UI
   const [textInput, setTextInput] = useState("");
   const [textPosition, setTextPosition] = useState<Point | null>(null);
   const [showTextInput, setShowTextInput] = useState(false);
-  const [showToolbar, setShowToolbar] = useState(true);
+
+  // 완성된 그리기 목록 (ref로 관리 - 캔버스 직접 조작)
+  const drawingsRef = useRef<Drawing[]>([]);
   const nextIdRef = useRef(1);
-  const [customColor, setCustomColor] = useState("#ef4444");
-  const [fontSize, setFontSize] = useState(14);
 
-  // 캔버스 크기 동기화
-  useEffect(() => {
+  // 드래그 상태 (ref - state 아님! 리렌더링 없이 직접 캔버스 조작)
+  const isDrawingRef = useRef(false);
+  const startPointRef = useRef<Point | null>(null);
+  const currentPointRef = useRef<Point | null>(null);
+  const freehandPointsRef = useRef<Point[]>([]);
+  const rafRef = useRef<number>(0);
+
+  // 현재 도구/설정을 ref로도 보관 (이벤트 핸들러에서 최신값 접근)
+  const toolRef = useRef(tool);
+  const colorRef = useRef(color);
+  const lineWidthRef = useRef(lineWidth);
+  const lineStyleRef = useRef(lineStyle);
+  const fontSizeRef = useRef(fontSize);
+
+  useEffect(() => { toolRef.current = tool; }, [tool]);
+  useEffect(() => { colorRef.current = color; }, [color]);
+  useEffect(() => { lineWidthRef.current = lineWidth; }, [lineWidth]);
+  useEffect(() => { lineStyleRef.current = lineStyle; }, [lineStyle]);
+  useEffect(() => { fontSizeRef.current = fontSize; }, [fontSize]);
+
+  // width/height를 ref로도 보관
+  const widthRef = useRef(width);
+  const heightRef = useRef(height);
+  useEffect(() => { widthRef.current = width; }, [width]);
+  useEffect(() => { heightRef.current = height; }, [height]);
+
+  // ─── 캔버스 유틸 ──────────────────────────────────
+  const getCtx = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    const ctx = canvas.getContext("2d");
-    if (ctx) ctx.scale(dpr, dpr);
-    redraw();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, height]);
+    if (!canvas) return null;
+    return canvas.getContext("2d");
+  }, []);
 
-  // ─── 그리기 유틸 ──────────────────────────────────
-  const setLineStyleOnCtx = useCallback((ctx: CanvasRenderingContext2D, style: "solid" | "dashed" | "dotted") => {
+  const applyDpr = useCallback((ctx: CanvasRenderingContext2D) => {
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }, []);
+
+  const setLineDash = useCallback((ctx: CanvasRenderingContext2D, style: "solid" | "dashed" | "dotted") => {
     if (style === "dashed") ctx.setLineDash([8, 4]);
     else if (style === "dotted") ctx.setLineDash([2, 3]);
     else ctx.setLineDash([]);
   }, []);
 
-  const drawSingleDrawing = useCallback((ctx: CanvasRenderingContext2D, d: Drawing) => {
+  // 단일 도형 그리기
+  const drawOne = useCallback((ctx: CanvasRenderingContext2D, d: Drawing, w: number, h: number) => {
+    ctx.save();
     ctx.strokeStyle = d.color;
     ctx.fillStyle = d.color;
     ctx.lineWidth = d.lineWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    setLineStyleOnCtx(ctx, d.lineStyle);
+    setLineDash(ctx, d.lineStyle);
 
     switch (d.type) {
       case "trendline": {
@@ -146,20 +173,19 @@ export default function ChartDrawingOverlay({ active, width, height }: ChartDraw
       case "horizontal": {
         ctx.beginPath();
         ctx.moveTo(0, d.start.y);
-        ctx.lineTo(width, d.start.y);
+        ctx.lineTo(w, d.start.y);
         ctx.stroke();
         // 가격 라벨 표시 (우측)
         ctx.setLineDash([]);
         ctx.font = "10px monospace";
-        ctx.fillStyle = d.color;
         const label = `─ ${d.start.y.toFixed(0)}px`;
-        ctx.fillText(label, width - 60, d.start.y - 4);
+        ctx.fillText(label, w - 60, d.start.y - 4);
         break;
       }
       case "vertical": {
         ctx.beginPath();
         ctx.moveTo(d.start.x, 0);
-        ctx.lineTo(d.start.x, height);
+        ctx.lineTo(d.start.x, h);
         ctx.stroke();
         break;
       }
@@ -168,7 +194,7 @@ export default function ChartDrawingOverlay({ active, width, height }: ChartDraw
         const dy = d.end.y - d.start.y;
         const len = Math.sqrt(dx * dx + dy * dy);
         if (len === 0) break;
-        const scale = Math.max(width, height) * 2 / len;
+        const scale = Math.max(w, h) * 2 / len;
         ctx.beginPath();
         ctx.moveTo(d.start.x, d.start.y);
         ctx.lineTo(d.start.x + dx * scale, d.start.y + dy * scale);
@@ -187,11 +213,8 @@ export default function ChartDrawingOverlay({ active, width, height }: ChartDraw
         ctx.beginPath();
         ctx.rect(rx, ry, rw, rh);
         ctx.stroke();
-        // 반투명 채우기
-        ctx.save();
         ctx.globalAlpha = 0.08;
         ctx.fillRect(rx, ry, rw, rh);
-        ctx.restore();
         break;
       }
       case "freehand": {
@@ -207,119 +230,136 @@ export default function ChartDrawingOverlay({ active, width, height }: ChartDraw
       case "text": {
         ctx.setLineDash([]);
         ctx.font = `${d.fontSize}px monospace`;
-        ctx.fillStyle = d.color;
         ctx.fillText(d.content, d.position.x, d.position.y);
         break;
       }
     }
-    ctx.setLineDash([]);
-  }, [width, height, setLineStyleOnCtx]);
+    ctx.restore();
+  }, [setLineDash]);
 
-  const redraw = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+  // 전체 화면 다시 그리기 (완성된 도형들 + 현재 프리뷰)
+  const renderFrame = useCallback(() => {
+    const ctx = getCtx();
     if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    ctx.clearRect(0, 0, width * dpr, height * dpr);
-    drawings.forEach((d) => drawSingleDrawing(ctx, d));
-  }, [drawings, width, height, drawSingleDrawing]);
 
-  useEffect(() => {
-    redraw();
-  }, [redraw]);
+    const w = widthRef.current;
+    const h = heightRef.current;
 
-  // 임시 프리뷰 그리기
-  const drawPreview = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    ctx.clearRect(0, 0, width * dpr, height * dpr);
-    drawings.forEach((d) => drawSingleDrawing(ctx, d));
+    // DPR 재적용 (안전)
+    applyDpr(ctx);
+    ctx.clearRect(0, 0, w, h);
 
-    if (!startPoint || !currentPoint) return;
-    if (tool === "none" || tool === "text" || tool === "eraser") return;
+    // 1. 완성된 도형 그리기
+    drawingsRef.current.forEach((d) => drawOne(ctx, d, w, h));
 
-    ctx.strokeStyle = color;
-    ctx.fillStyle = color;
-    ctx.lineWidth = lineWidth;
+    // 2. 현재 드래그 중 프리뷰
+    if (!isDrawingRef.current) return;
+    const start = startPointRef.current;
+    const cur = currentPointRef.current;
+    const t = toolRef.current;
+    if (!start || !cur) return;
+    if (t === "none" || t === "text" || t === "eraser") return;
+
+    ctx.save();
+    ctx.strokeStyle = colorRef.current;
+    ctx.fillStyle = colorRef.current;
+    ctx.lineWidth = lineWidthRef.current;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.globalAlpha = 0.7;
-    setLineStyleOnCtx(ctx, lineStyle);
+    setLineDash(ctx, lineStyleRef.current);
 
-    switch (tool) {
+    switch (t) {
       case "trendline": {
         ctx.beginPath();
-        ctx.moveTo(startPoint.x, startPoint.y);
-        ctx.lineTo(currentPoint.x, currentPoint.y);
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(cur.x, cur.y);
         ctx.stroke();
         break;
       }
       case "horizontal": {
         ctx.beginPath();
-        ctx.moveTo(0, currentPoint.y);
-        ctx.lineTo(width, currentPoint.y);
+        ctx.moveTo(0, cur.y);
+        ctx.lineTo(w, cur.y);
         ctx.stroke();
+        // 라벨
+        ctx.globalAlpha = 0.5;
+        ctx.setLineDash([]);
+        ctx.font = "10px monospace";
+        ctx.fillText(`─ ${cur.y.toFixed(0)}px`, w - 60, cur.y - 4);
         break;
       }
       case "vertical": {
         ctx.beginPath();
-        ctx.moveTo(currentPoint.x, 0);
-        ctx.lineTo(currentPoint.x, height);
+        ctx.moveTo(cur.x, 0);
+        ctx.lineTo(cur.x, h);
         ctx.stroke();
         break;
       }
       case "ray": {
-        const dx = currentPoint.x - startPoint.x;
-        const dy = currentPoint.y - startPoint.y;
+        const dx = cur.x - start.x;
+        const dy = cur.y - start.y;
         const len = Math.sqrt(dx * dx + dy * dy);
         if (len > 0) {
-          const scale = Math.max(width, height) * 2 / len;
+          const scale = Math.max(w, h) * 2 / len;
           ctx.beginPath();
-          ctx.moveTo(startPoint.x, startPoint.y);
-          ctx.lineTo(startPoint.x + dx * scale, startPoint.y + dy * scale);
+          ctx.moveTo(start.x, start.y);
+          ctx.lineTo(start.x + dx * scale, start.y + dy * scale);
           ctx.stroke();
+          // 시작점
+          ctx.beginPath();
+          ctx.arc(start.x, start.y, 3, 0, Math.PI * 2);
+          ctx.fill();
         }
         break;
       }
       case "rectangle": {
-        const rx = Math.min(startPoint.x, currentPoint.x);
-        const ry = Math.min(startPoint.y, currentPoint.y);
-        const rw = Math.abs(currentPoint.x - startPoint.x);
-        const rh = Math.abs(currentPoint.y - startPoint.y);
+        const rx = Math.min(start.x, cur.x);
+        const ry = Math.min(start.y, cur.y);
+        const rw = Math.abs(cur.x - start.x);
+        const rh = Math.abs(cur.y - start.y);
         ctx.beginPath();
         ctx.rect(rx, ry, rw, rh);
         ctx.stroke();
-        ctx.save();
         ctx.globalAlpha = 0.05;
         ctx.fillRect(rx, ry, rw, rh);
-        ctx.restore();
         break;
       }
       case "freehand": {
-        if (freehandPoints.length < 2) break;
+        const pts = freehandPointsRef.current;
+        if (pts.length < 2) break;
         ctx.beginPath();
-        ctx.moveTo(freehandPoints[0].x, freehandPoints[0].y);
-        for (let i = 1; i < freehandPoints.length; i++) {
-          ctx.lineTo(freehandPoints[i].x, freehandPoints[i].y);
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x, pts[i].y);
         }
         ctx.stroke();
         break;
       }
     }
-    ctx.globalAlpha = 1;
-    ctx.setLineDash([]);
-  }, [drawings, startPoint, currentPoint, tool, color, lineWidth, lineStyle, freehandPoints, width, height, drawSingleDrawing, setLineStyleOnCtx]);
+    ctx.restore();
+  }, [getCtx, applyDpr, drawOne, setLineDash]);
 
+  // 캔버스 크기 동기화
   useEffect(() => {
-    if (isDrawing) drawPreview();
-  }, [isDrawing, drawPreview]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    renderFrame();
+  }, [width, height, renderFrame]);
 
-  // ─── 마우스 이벤트 ────────────────────────────────
-  const getCanvasPoint = (e: React.MouseEvent): Point => {
+  // drawingsRef 변경 후 다시 그리기
+  const scheduleRender = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(renderFrame);
+  }, [renderFrame]);
+
+  // ─── 좌표 계산 ────────────────────────────────────
+  const getCanvasPoint = useCallback((e: MouseEvent | React.MouseEvent): Point => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
@@ -327,20 +367,22 @@ export default function ChartDrawingOverlay({ active, width, height }: ChartDraw
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     };
-  };
+  }, []);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!active) return;
-    e.preventDefault();
-    e.stopPropagation();
+  // ─── 마우스 이벤트 (네이티브 이벤트 리스너) ────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !active) return;
 
-    const point = getCanvasPoint(e);
+    const handleMouseDown = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const point = getCanvasPoint(e);
+      const t = toolRef.current;
 
-    if (tool === "eraser") {
-      // 지우개: 클릭 위치 근처의 그리기 삭제
-      const threshold = 10;
-      setDrawings((prev) =>
-        prev.filter((d) => {
+      if (t === "eraser") {
+        const threshold = 10;
+        drawingsRef.current = drawingsRef.current.filter((d) => {
           if (d.type === "freehand") {
             return !d.points.some((p) => Math.abs(p.x - point.x) < threshold && Math.abs(p.y - point.y) < threshold);
           }
@@ -353,121 +395,186 @@ export default function ChartDrawingOverlay({ active, width, height }: ChartDraw
           if (d.type === "vertical") {
             return Math.abs(d.start.x - point.x) >= threshold;
           }
-          // trendline, ray, rectangle: 시작/끝점 근처
-          return !(
-            (Math.abs(d.start.x - point.x) < threshold && Math.abs(d.start.y - point.y) < threshold) ||
-            (Math.abs(d.end.x - point.x) < threshold && Math.abs(d.end.y - point.y) < threshold)
-          );
-        })
-      );
-      return;
-    }
-
-    if (tool === "text") {
-      setTextPosition(point);
-      setShowTextInput(true);
-      setTextInput("");
-      return;
-    }
-
-    if (tool === "horizontal" || tool === "vertical") {
-      const id = nextIdRef.current++;
-      const drawing: Drawing = {
-        id,
-        type: tool,
-        color,
-        lineWidth,
-        lineStyle,
-        start: point,
-        end: point,
-      };
-      setDrawings((prev) => [...prev, drawing]);
-      return;
-    }
-
-    setIsDrawing(true);
-    setStartPoint(point);
-    setCurrentPoint(point);
-    if (tool === "freehand") {
-      setFreehandPoints([point]);
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!active || !isDrawing) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const point = getCanvasPoint(e);
-    setCurrentPoint(point);
-    if (tool === "freehand") {
-      setFreehandPoints((prev) => [...prev, point]);
-    }
-  };
-
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (!active || !isDrawing || !startPoint) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    const point = getCanvasPoint(e);
-    const id = nextIdRef.current++;
-
-    if (tool === "freehand") {
-      const finalPoints = [...freehandPoints, point];
-      if (finalPoints.length >= 2) {
-        const drawing: FreehandDrawing = { id, type: "freehand", color, lineWidth, lineStyle, points: finalPoints };
-        setDrawings((prev) => [...prev, drawing]);
+          // trendline, ray, rectangle: 시작/끝점 및 선 위 근처
+          const distToLine = pointToSegmentDist(point, d.start, d.end);
+          return distToLine >= threshold;
+        });
+        setDrawingCount(drawingsRef.current.length);
+        scheduleRender();
+        return;
       }
-      setFreehandPoints([]);
-    } else if (tool === "trendline" || tool === "ray") {
-      const drawing: LineDrawing = { id, type: tool, color, lineWidth, lineStyle, start: startPoint, end: point };
-      setDrawings((prev) => [...prev, drawing]);
-    } else if (tool === "rectangle") {
-      const drawing: RectDrawing = { id, type: "rectangle", color, lineWidth, lineStyle, start: startPoint, end: point };
-      setDrawings((prev) => [...prev, drawing]);
-    }
 
-    setIsDrawing(false);
-    setStartPoint(null);
-    setCurrentPoint(null);
-  };
+      if (t === "text") {
+        setTextPosition(point);
+        setShowTextInput(true);
+        setTextInput("");
+        return;
+      }
 
-  const handleTextSubmit = () => {
+      // 수평선/수직선: 드래그 모드로 시작 (마우스 따라다니는 프리뷰)
+      isDrawingRef.current = true;
+      startPointRef.current = point;
+      currentPointRef.current = point;
+
+      if (t === "freehand") {
+        freehandPointsRef.current = [point];
+      }
+
+      scheduleRender();
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDrawingRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const point = getCanvasPoint(e);
+      currentPointRef.current = point;
+
+      if (toolRef.current === "freehand") {
+        freehandPointsRef.current.push(point);
+      }
+
+      scheduleRender();
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (!isDrawingRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = getCanvasPoint(e);
+      const start = startPointRef.current;
+      const t = toolRef.current;
+      if (!start) {
+        isDrawingRef.current = false;
+        return;
+      }
+
+      const id = nextIdRef.current++;
+      const c = colorRef.current;
+      const lw = lineWidthRef.current;
+      const ls = lineStyleRef.current;
+      const w = widthRef.current;
+      const h = heightRef.current;
+
+      // 최소 거리 체크 (너무 짧은 클릭 무시 — 수평/수직선 제외)
+      const dist = Math.sqrt((point.x - start.x) ** 2 + (point.y - start.y) ** 2);
+
+      if (t === "freehand") {
+        freehandPointsRef.current.push(point);
+        if (freehandPointsRef.current.length >= 2) {
+          drawingsRef.current.push({
+            id, type: "freehand", color: c, lineWidth: lw, lineStyle: ls,
+            points: [...freehandPointsRef.current],
+          });
+        }
+        freehandPointsRef.current = [];
+      } else if (t === "horizontal") {
+        drawingsRef.current.push({
+          id, type: "horizontal", color: c, lineWidth: lw, lineStyle: ls,
+          start: { x: 0, y: point.y }, end: { x: w, y: point.y },
+        });
+      } else if (t === "vertical") {
+        drawingsRef.current.push({
+          id, type: "vertical", color: c, lineWidth: lw, lineStyle: ls,
+          start: { x: point.x, y: 0 }, end: { x: point.x, y: h },
+        });
+      } else if (t === "trendline" && dist >= 3) {
+        drawingsRef.current.push({
+          id, type: "trendline", color: c, lineWidth: lw, lineStyle: ls,
+          start, end: point,
+        });
+      } else if (t === "ray" && dist >= 3) {
+        drawingsRef.current.push({
+          id, type: "ray", color: c, lineWidth: lw, lineStyle: ls,
+          start, end: point,
+        });
+      } else if (t === "rectangle" && dist >= 3) {
+        drawingsRef.current.push({
+          id, type: "rectangle", color: c, lineWidth: lw, lineStyle: ls,
+          start, end: point,
+        });
+      }
+
+      isDrawingRef.current = false;
+      startPointRef.current = null;
+      currentPointRef.current = null;
+      setDrawingCount(drawingsRef.current.length);
+      scheduleRender();
+    };
+
+    const handleMouseLeave = () => {
+      if (isDrawingRef.current && toolRef.current === "freehand") {
+        // 자유그리기 중 캔버스 밖으로 나가면 자동 완료
+        const pts = freehandPointsRef.current;
+        if (pts.length >= 2) {
+          const id = nextIdRef.current++;
+          drawingsRef.current.push({
+            id, type: "freehand",
+            color: colorRef.current, lineWidth: lineWidthRef.current, lineStyle: lineStyleRef.current,
+            points: [...pts],
+          });
+        }
+        freehandPointsRef.current = [];
+        isDrawingRef.current = false;
+        startPointRef.current = null;
+        currentPointRef.current = null;
+        setDrawingCount(drawingsRef.current.length);
+        scheduleRender();
+      }
+    };
+
+    canvas.addEventListener("mousedown", handleMouseDown);
+    canvas.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("mouseup", handleMouseUp);
+    canvas.addEventListener("mouseleave", handleMouseLeave);
+
+    return () => {
+      canvas.removeEventListener("mousedown", handleMouseDown);
+      canvas.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("mouseup", handleMouseUp);
+      canvas.removeEventListener("mouseleave", handleMouseLeave);
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [active, getCanvasPoint, scheduleRender]);
+
+  // ─── 텍스트 입력 완료 ────────────────────────────
+  const handleTextSubmit = useCallback(() => {
     if (!textPosition || !textInput.trim()) {
       setShowTextInput(false);
       return;
     }
     const id = nextIdRef.current++;
-    const drawing: TextDrawing = {
-      id,
-      type: "text",
-      color,
-      lineWidth,
-      lineStyle,
-      position: textPosition,
-      content: textInput,
-      fontSize,
-    };
-    setDrawings((prev) => [...prev, drawing]);
+    drawingsRef.current.push({
+      id, type: "text",
+      color: colorRef.current, lineWidth: lineWidthRef.current, lineStyle: lineStyleRef.current,
+      position: textPosition, content: textInput, fontSize: fontSizeRef.current,
+    });
     setShowTextInput(false);
     setTextInput("");
     setTextPosition(null);
-  };
+    setDrawingCount(drawingsRef.current.length);
+    scheduleRender();
+  }, [textPosition, textInput, scheduleRender]);
 
-  const handleUndo = () => {
-    setDrawings((prev) => prev.slice(0, -1));
-  };
+  // ─── 되돌리기 / 전체삭제 ─────────────────────────
+  const handleUndo = useCallback(() => {
+    drawingsRef.current.pop();
+    setDrawingCount(drawingsRef.current.length);
+    scheduleRender();
+  }, [scheduleRender]);
 
-  const handleClearAll = () => {
-    setDrawings([]);
-  };
+  const handleClearAll = useCallback(() => {
+    drawingsRef.current = [];
+    setDrawingCount(0);
+    scheduleRender();
+  }, [scheduleRender]);
 
   if (!active) return null;
 
   const getCursor = () => {
     if (tool === "eraser") return "crosshair";
     if (tool === "text") return "text";
-    if (tool === "freehand") return "crosshair";
     return "crosshair";
   };
 
@@ -482,14 +589,6 @@ export default function ChartDrawingOverlay({ active, width, height }: ChartDraw
           height: `${height}px`,
           cursor: getCursor(),
           pointerEvents: active ? "auto" : "none",
-        }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => {
-          if (isDrawing && tool === "freehand" && startPoint) {
-            handleMouseUp({ preventDefault: () => {}, stopPropagation: () => {}, clientX: 0, clientY: 0 } as unknown as React.MouseEvent);
-          }
         }}
       />
 
@@ -632,7 +731,7 @@ export default function ChartDrawingOverlay({ active, width, height }: ChartDraw
           <div className="bg-slate-800/95 border border-slate-600/60 rounded-lg p-1.5 shadow-xl backdrop-blur-sm flex gap-0.5">
             <button
               onClick={handleUndo}
-              disabled={drawings.length === 0}
+              disabled={drawingCount === 0}
               className="px-1.5 py-0.5 text-[10px] font-mono rounded text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="되돌리기 (Undo)"
             >
@@ -640,7 +739,7 @@ export default function ChartDrawingOverlay({ active, width, height }: ChartDraw
             </button>
             <button
               onClick={handleClearAll}
-              disabled={drawings.length === 0}
+              disabled={drawingCount === 0}
               className="px-1.5 py-0.5 text-[10px] font-mono rounded text-red-400 hover:text-red-300 hover:bg-red-400/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="전체 삭제"
             >
@@ -670,8 +769,21 @@ export default function ChartDrawingOverlay({ active, width, height }: ChartDraw
 
       {/* 현재 도구 + 그리기 수 표시 */}
       <div className="absolute bottom-1 left-1 z-20 bg-slate-800/90 border border-slate-600/60 rounded px-2 py-0.5 text-[10px] font-mono text-slate-400 backdrop-blur-sm">
-        {TOOLS.find((t) => t.key === tool)?.label || "선택"} | {drawings.length}개 그림
+        {TOOLS.find((t) => t.key === tool)?.label || "선택"} | {drawingCount}개 그림
       </div>
     </>
   );
+}
+
+// ─── 유틸: 점에서 선분까지의 거리 ──────────────────
+function pointToSegmentDist(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.sqrt((p.x - a.x) ** 2 + (p.y - a.y) ** 2);
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const projX = a.x + t * dx;
+  const projY = a.y + t * dy;
+  return Math.sqrt((p.x - projX) ** 2 + (p.y - projY) ** 2);
 }
