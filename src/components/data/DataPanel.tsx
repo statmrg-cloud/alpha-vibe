@@ -50,6 +50,8 @@ interface PriceAlert {
   direction: "above" | "below";
   enabled: boolean;
   triggered: boolean;
+  triggeredPrice?: number;
+  triggeredAt?: string;
 }
 
 function loadPriceAlerts(): PriceAlert[] {
@@ -431,6 +433,80 @@ export default function DataPanel() {
     });
   };
 
+  // 가격 알림 체크 (관심종목 + 미등록 종목 모두)
+  const checkPriceAlerts = useCallback(async (watchlistPrices: WatchlistData[]) => {
+    setPriceAlerts((prev) => {
+      // 체크할 대상 필터
+      const activeAlerts = prev.filter((a) => a.enabled && !a.triggered);
+      if (activeAlerts.length === 0) return prev;
+
+      // 관심종목에 없는 종목 목록
+      const missingSymbols = activeAlerts
+        .filter((a) => !watchlistPrices.find((w) => w.symbol === a.symbol))
+        .map((a) => a.symbol);
+
+      if (missingSymbols.length > 0) {
+        // 비동기로 가격 fetch 후 다시 체크
+        Promise.all(
+          Array.from(new Set(missingSymbols)).map(async (sym) => {
+            try {
+              const res = await fetch(`/api/stock?symbol=${encodeURIComponent(sym)}&lite=true`);
+              if (!res.ok) return null;
+              const data = await res.json();
+              return { symbol: sym, price: data.price || 0 };
+            } catch { return null; }
+          })
+        ).then((results) => {
+          const extraPrices = results.filter(Boolean) as Array<{ symbol: string; price: number }>;
+          if (extraPrices.length === 0) return;
+          setPriceAlerts((current) => {
+            let changed = false;
+            const newAlerts = current.map((alert) => {
+              if (!alert.enabled || alert.triggered) return alert;
+              const extra = extraPrices.find((p) => p.symbol === alert.symbol);
+              if (!extra || extra.price <= 0) return alert;
+              return triggerAlertIfHit(alert, extra.price, () => { changed = true; });
+            });
+            if (changed) localStorage.setItem("alpha-vibe-price-alerts", JSON.stringify(newAlerts));
+            return changed ? newAlerts : current;
+          });
+        });
+      }
+
+      // 관심종목에 있는 종목은 즉시 체크
+      let changed = false;
+      const newAlerts = prev.map((alert) => {
+        if (!alert.enabled || alert.triggered) return alert;
+        const stock = watchlistPrices.find((s) => s.symbol === alert.symbol);
+        if (!stock || stock.price <= 0) return alert;
+        return triggerAlertIfHit(alert, stock.price, () => { changed = true; });
+      });
+      if (changed) localStorage.setItem("alpha-vibe-price-alerts", JSON.stringify(newAlerts));
+      return changed ? newAlerts : prev;
+    });
+  }, []);
+
+  // 알림 트리거 판정 헬퍼
+  const triggerAlertIfHit = (alert: PriceAlert, currentPrice: number, onHit: () => void): PriceAlert => {
+    const hit = alert.direction === "below"
+      ? currentPrice <= alert.targetPrice
+      : currentPrice >= alert.targetPrice;
+    if (!hit) return alert;
+    onHit();
+    const isKR = alert.symbol.endsWith(".KS") || alert.symbol.endsWith(".KQ");
+    const priceStr = isKR ? currentPrice.toLocaleString() : `$${currentPrice.toFixed(2)}`;
+    const targetStr = isKR ? alert.targetPrice.toLocaleString() : `$${alert.targetPrice.toFixed(2)}`;
+    const dirLabel = alert.direction === "below" ? "이하 도달" : "이상 도달";
+    // 브라우저 알림
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      new Notification(`${alert.name} 가격 알림`, {
+        body: `현재가 ${priceStr} (목표 ${targetStr} ${dirLabel})`,
+        icon: "/favicon.ico",
+      });
+    }
+    return { ...alert, triggered: true, triggeredPrice: currentPrice, triggeredAt: new Date().toISOString() };
+  };
+
   // 실시간 워치리스트 데이터 fetch
   const fetchWatchlistData = useCallback(async () => {
     const symbols = watchlistSymbols;
@@ -455,34 +531,8 @@ export default function DataPanel() {
     );
     setWatchlist(updated);
 
-    // 가격 알림 체크
-    setPriceAlerts((prev) => {
-      let changed = false;
-      const newAlerts = prev.map((alert) => {
-        if (!alert.enabled || alert.triggered) return alert;
-        const stock = updated.find((s) => s.symbol === alert.symbol);
-        if (!stock || stock.price <= 0) return alert;
-        const hit = alert.direction === "below"
-          ? stock.price <= alert.targetPrice
-          : stock.price >= alert.targetPrice;
-        if (hit) {
-          changed = true;
-          const isKR = alert.symbol.endsWith(".KS") || alert.symbol.endsWith(".KQ");
-          const priceStr = isKR ? stock.price.toLocaleString() : `$${stock.price.toFixed(2)}`;
-          const dirLabel = alert.direction === "below" ? "이하 도달" : "이상 도달";
-          // 브라우저 알림
-          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-            new Notification(`${alert.name} 가격 알림`, { body: `현재가 ${priceStr} — 목표가 ${dirLabel}`, icon: "/favicon.ico" });
-          }
-          // fallback alert
-          try { window.alert(`[가격 알림] ${alert.name}\n현재가: ${priceStr}\n${dirLabel}`); } catch { /* ignore */ }
-          return { ...alert, triggered: true };
-        }
-        return alert;
-      });
-      if (changed) localStorage.setItem("alpha-vibe-price-alerts", JSON.stringify(newAlerts));
-      return changed ? newAlerts : prev;
-    });
+    // 가격 알림 체크 — 관심종목에 없는 종목도 별도 fetch
+    checkPriceAlerts(updated);
   }, [watchlistSymbols]);
 
   useEffect(() => {
@@ -1092,25 +1142,34 @@ export default function DataPanel() {
               <div className="space-y-1">
                 {priceAlerts.map((alert, idx) => {
                   const isKR = alert.symbol.endsWith(".KS") || alert.symbol.endsWith(".KQ");
+                  const fmtTarget = isKR ? alert.targetPrice.toLocaleString() : `$${alert.targetPrice.toFixed(2)}`;
                   return (
-                    <div key={idx} className={`flex items-center justify-between text-xs font-mono px-1.5 py-1 rounded ${alert.triggered ? "bg-yellow-500/10 border border-yellow-500/20" : "hover:bg-secondary/30"}`}>
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={`shrink-0 ${alert.triggered ? "text-yellow-400" : "text-slate-300"}`}>
-                          {alert.triggered ? "✓" : "●"}
-                        </span>
-                        <span className="truncate text-slate-200">{alert.name}</span>
+                    <div key={idx} className={`text-xs font-mono px-1.5 py-1 rounded ${alert.triggered ? "bg-yellow-500/10 border border-yellow-500/20" : "hover:bg-secondary/30"}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className={`shrink-0 ${alert.triggered ? "text-yellow-400" : "text-slate-300"}`}>
+                            {alert.triggered ? "✓" : "●"}
+                          </span>
+                          <span className={`truncate ${alert.triggered ? "text-yellow-300" : "text-slate-200"}`}>{alert.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={alert.triggered ? "text-yellow-400/70 line-through" : "text-yellow-400"}>
+                            {alert.direction === "below" ? "≤" : "≥"} {fmtTarget}
+                          </span>
+                          <button
+                            onClick={() => removePriceAlert(idx)}
+                            className="text-slate-500 hover:text-red-400 transition-colors text-[10px]"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-yellow-400">
-                          {alert.direction === "below" ? "≤" : "≥"} {isKR ? alert.targetPrice.toLocaleString() : `$${alert.targetPrice.toFixed(2)}`}
-                        </span>
-                        <button
-                          onClick={() => removePriceAlert(idx)}
-                          className="text-slate-500 hover:text-red-400 transition-colors text-[10px]"
-                        >
-                          ✕
-                        </button>
-                      </div>
+                      {alert.triggered && (
+                        <div className="text-[10px] text-yellow-500/60 mt-0.5 pl-5">
+                          {alert.triggeredAt ? new Date(alert.triggeredAt).toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : ""} 발동
+                          {alert.triggeredPrice ? ` (${isKR ? alert.triggeredPrice.toLocaleString() : `$${alert.triggeredPrice.toFixed(2)}`})` : ""}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
