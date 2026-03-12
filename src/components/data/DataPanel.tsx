@@ -148,11 +148,11 @@ export default function DataPanel() {
   const [suggestions, setSuggestions] = useState<Array<{ name: string; symbol: string }>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
-  const [watchlistSymbols, setWatchlistSymbols] = useState<Array<{ symbol: string; name: string }>>(loadWatchlistSymbols);
+  const [watchlistSymbols, setWatchlistSymbols] = useState<Array<{ symbol: string; name: string }>>(DEFAULT_WATCHLIST);
   const [watchlist, setWatchlist] = useState<WatchlistData[]>(
-    loadWatchlistSymbols().map((w) => ({ ...w, price: 0, changePercent: 0, loading: true }))
+    DEFAULT_WATCHLIST.map((w) => ({ ...w, price: 0, changePercent: 0, loading: true }))
   );
-  const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>(loadPriceAlerts);
+  const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
   const [alertInput, setAlertInput] = useState("");
   const [alertDirection, setAlertDirection] = useState<"below" | "above">("below");
   const [alertToasts, setAlertToasts] = useState<Array<{ id: number; message: string; name: string }>>([]);
@@ -161,15 +161,9 @@ export default function DataPanel() {
   const [realTradeModal, setRealTradeModal] = useState<RealTradeModalState | null>(null);
   const [chartPrice, setChartPrice] = useState<{ price: number; name: string } | null>(null);
   const [exchangeRate, setExchangeRate] = useState<number>(1350);
-  const [showAlpaca, setShowAlpaca] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("alpha-vibe-show-alpaca") === "true";
-  });
+  const [showAlpaca, setShowAlpaca] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [fontScale, setFontScale] = useState<string>(() => {
-    if (typeof window === "undefined") return "md";
-    return localStorage.getItem("alpha-vibe-font-scale") || "md";
-  });
+  const [fontScale, setFontScale] = useState<string>("md");
 
   const toggleAlpaca = (val: boolean) => {
     setShowAlpaca(val);
@@ -183,6 +177,16 @@ export default function DataPanel() {
       .replace(/font-scale-\w+/g, "")
       .trim() + ` font-scale-${scale}`;
   };
+
+  // 클라이언트에서 localStorage 복원 (hydration 불일치 방지)
+  useEffect(() => {
+    const savedWatchlist = loadWatchlistSymbols();
+    setWatchlistSymbols(savedWatchlist);
+    setWatchlist(savedWatchlist.map((w) => ({ ...w, price: 0, changePercent: 0, loading: true })));
+    setPriceAlerts(loadPriceAlerts());
+    setShowAlpaca(localStorage.getItem("alpha-vibe-show-alpaca") === "true");
+    setFontScale(localStorage.getItem("alpha-vibe-font-scale") || "md");
+  }, []);
 
   // 초기 폰트 스케일 적용
   useEffect(() => {
