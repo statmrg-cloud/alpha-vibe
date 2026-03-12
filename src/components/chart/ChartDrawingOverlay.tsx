@@ -95,6 +95,11 @@ const ChartDrawingOverlay = forwardRef<ChartDrawingOverlayHandle, ChartDrawingOv
     const freehandPointsRef = useRef<Point[]>([]);
     const rafRef = useRef<number>(0);
 
+    // 텍스트 드래그 이동 상태
+    const isDraggingTextRef = useRef(false);
+    const dragTextIdRef = useRef<number | null>(null);
+    const dragOffsetRef = useRef<Point>({ x: 0, y: 0 });
+
     // settings를 ref로 보관 (이벤트 핸들러에서 최신값 접근)
     const settingsRef = useRef(settings);
     useEffect(() => { settingsRef.current = settings; }, [settings]);
@@ -348,6 +353,32 @@ const ChartDrawingOverlay = forwardRef<ChartDrawingOverlayHandle, ChartDrawingOv
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }, []);
 
+    // ─── 텍스트 히트 테스트 (클릭한 위치에 텍스트가 있는지) ───
+    const hitTestText = useCallback((point: Point): TextDrawing | null => {
+      const ctx = getCtx();
+      for (let i = drawingsRef.current.length - 1; i >= 0; i--) {
+        const d = drawingsRef.current[i];
+        if (d.type !== "text") continue;
+        const fontSize = d.fontSize || 14;
+        // 텍스트 너비 측정
+        let textWidth = d.content.length * fontSize * 0.6; // 기본 추정
+        if (ctx) {
+          ctx.font = `${fontSize}px monospace`;
+          textWidth = ctx.measureText(d.content).width;
+        }
+        // 텍스트 영역: position.x ~ position.x + textWidth, position.y - fontSize ~ position.y
+        if (
+          point.x >= d.position.x - 4 &&
+          point.x <= d.position.x + textWidth + 4 &&
+          point.y >= d.position.y - fontSize - 4 &&
+          point.y <= d.position.y + 4
+        ) {
+          return d;
+        }
+      }
+      return null;
+    }, [getCtx]);
+
     // ─── 마우스 이벤트 ────────────────────────────────
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -378,6 +409,18 @@ const ChartDrawingOverlay = forwardRef<ChartDrawingOverlayHandle, ChartDrawingOv
           return;
         }
 
+        // 텍스트 드래그 이동: 텍스트 도구가 아닌 상태에서도 기존 텍스트를 클릭하면 이동
+        const hitText = hitTestText(point);
+        if (hitText) {
+          isDraggingTextRef.current = true;
+          dragTextIdRef.current = hitText.id;
+          dragOffsetRef.current = {
+            x: point.x - hitText.position.x,
+            y: point.y - hitText.position.y,
+          };
+          return;
+        }
+
         if (t === "text") {
           setTextPosition(point);
           setShowTextInput(true);
@@ -393,6 +436,22 @@ const ChartDrawingOverlay = forwardRef<ChartDrawingOverlayHandle, ChartDrawingOv
       };
 
       const handleMouseMove = (e: MouseEvent) => {
+        // 텍스트 드래그 이동 중
+        if (isDraggingTextRef.current && dragTextIdRef.current !== null) {
+          e.preventDefault();
+          e.stopPropagation();
+          const point = getCanvasPoint(e);
+          const d = drawingsRef.current.find((d) => d.id === dragTextIdRef.current);
+          if (d && d.type === "text") {
+            d.position = {
+              x: point.x - dragOffsetRef.current.x,
+              y: point.y - dragOffsetRef.current.y,
+            };
+            scheduleRender();
+          }
+          return;
+        }
+
         if (!isDrawingRef.current) return;
         e.preventDefault();
         e.stopPropagation();
@@ -405,6 +464,13 @@ const ChartDrawingOverlay = forwardRef<ChartDrawingOverlayHandle, ChartDrawingOv
       };
 
       const handleMouseUp = (e: MouseEvent) => {
+        // 텍스트 드래그 이동 완료
+        if (isDraggingTextRef.current) {
+          isDraggingTextRef.current = false;
+          dragTextIdRef.current = null;
+          return;
+        }
+
         if (!isDrawingRef.current) return;
         e.preventDefault();
         e.stopPropagation();
@@ -464,6 +530,13 @@ const ChartDrawingOverlay = forwardRef<ChartDrawingOverlayHandle, ChartDrawingOv
       };
 
       const handleMouseLeave = () => {
+        // 텍스트 드래그 중 캔버스 벗어나면 종료
+        if (isDraggingTextRef.current) {
+          isDraggingTextRef.current = false;
+          dragTextIdRef.current = null;
+          return;
+        }
+
         if (isDrawingRef.current && settingsRef.current.tool === "freehand") {
           const pts = freehandPointsRef.current;
           if (pts.length >= 2) {
@@ -496,7 +569,7 @@ const ChartDrawingOverlay = forwardRef<ChartDrawingOverlayHandle, ChartDrawingOv
         canvas.removeEventListener("mouseleave", handleMouseLeave);
         cancelAnimationFrame(rafRef.current);
       };
-    }, [active, getCanvasPoint, scheduleRender, onDrawingCountChange]);
+    }, [active, getCanvasPoint, hitTestText, scheduleRender, onDrawingCountChange]);
 
     // ─── 텍스트 입력 완료 ────────────────────────────
     const handleTextSubmit = useCallback(() => {
