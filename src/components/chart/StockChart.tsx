@@ -24,7 +24,14 @@ import {
   calcBollingerBands,
   detectCrosses,
 } from "@/lib/chart/indicators";
-import ChartDrawingOverlay from "@/components/chart/ChartDrawingOverlay";
+import ChartDrawingOverlay, {
+  type DrawingTool,
+  type DrawingSettings,
+  type ChartDrawingOverlayHandle,
+  COLOR_PRESETS,
+  LINE_WIDTHS,
+  DRAWING_TOOLS,
+} from "@/components/chart/ChartDrawingOverlay";
 
 // ─── 타입 ─────────────────────────────────────────────
 interface LivePrice {
@@ -203,9 +210,30 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenHeight, setFullscreenHeight] = useState(500);
   const [drawingMode, setDrawingMode] = useState(false);
+  const drawingModeRef = useRef(false);
   const fullscreenRef = useRef<HTMLDivElement>(null);
   const chartAreaRef = useRef<HTMLDivElement>(null);
   const [chartDimensions, setChartDimensions] = useState({ width: 0, height: 0 });
+  const drawingOverlayRef = useRef<ChartDrawingOverlayHandle>(null);
+  const [drawingCount, setDrawingCount] = useState(0);
+
+  // 그리기 도구 설정
+  const [drawingTool, setDrawingTool] = useState<DrawingTool>("trendline");
+  const [drawingColor, setDrawingColor] = useState("#ef4444");
+  const [drawingLineWidth, setDrawingLineWidth] = useState(2);
+  const [drawingLineStyle, setDrawingLineStyle] = useState<"solid" | "dashed" | "dotted">("solid");
+  const [drawingFontSize, setDrawingFontSize] = useState(14);
+  const [customColor, setCustomColor] = useState("#ef4444");
+
+  const drawingSettings: DrawingSettings = useMemo(() => ({
+    tool: drawingTool,
+    color: drawingColor,
+    lineWidth: drawingLineWidth,
+    lineStyle: drawingLineStyle,
+    fontSize: drawingFontSize,
+  }), [drawingTool, drawingColor, drawingLineWidth, drawingLineStyle, drawingFontSize]);
+
+  useEffect(() => { drawingModeRef.current = drawingMode; }, [drawingMode]);
 
   // 전체화면 높이 리사이즈 드래그
   const fsResizingRef = useRef<{ startY: number; startH: number } | null>(null);
@@ -459,7 +487,7 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
     if (loading) return;
 
     const handleMouseDown = (e: MouseEvent) => {
-      if (drawingMode) return; // 그리기 모드일 때 드래그 패닝 비활성화
+      if (drawingModeRef.current) return; // 그리기 모드일 때 드래그 패닝 비활성화
       const container = chartContainerRef.current;
       if (!container) return;
       const target = e.target as Node;
@@ -900,7 +928,10 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
           </button>
           <div className="w-px h-4 bg-border/50 shrink-0" />
           <button
-            onClick={() => setDrawingMode(!drawingMode)}
+            onClick={() => {
+              setDrawingMode(!drawingMode);
+              if (!drawingMode) setDrawingTool("trendline");
+            }}
             className={`px-1.5 py-0.5 text-[11px] font-mono rounded transition-colors whitespace-nowrap ${
               drawingMode
                 ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
@@ -1024,13 +1055,156 @@ export default function StockChart({ symbol, compact = false }: StockChartProps)
         </div>
       </div>
 
+      {/* 그리기 도구 바 (차트 바깥 상단) */}
+      {drawingMode && (
+        <div className="bg-slate-800/90 border border-orange-500/20 rounded-lg p-1.5 backdrop-blur-sm">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* 선 유형 */}
+            <div className="flex items-center gap-0.5">
+              {DRAWING_TOOLS.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setDrawingTool(t.key)}
+                  title={t.label}
+                  className={`flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-mono rounded transition-colors whitespace-nowrap ${
+                    drawingTool === t.key
+                      ? "bg-orange-500/30 text-orange-300 border border-orange-500/40"
+                      : "text-slate-300 hover:text-white hover:bg-slate-700"
+                  }`}
+                >
+                  <span className="w-3.5 text-center">{t.icon}</span>
+                  <span>{t.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="w-px h-5 bg-slate-600/50 shrink-0" />
+
+            {/* 색상 */}
+            <div className="flex items-center gap-0.5">
+              {COLOR_PRESETS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => { setDrawingColor(c); setCustomColor(c); }}
+                  className={`w-4 h-4 rounded-sm border transition-all ${
+                    drawingColor === c ? "border-white scale-125 shadow-lg" : "border-slate-600 hover:border-slate-400"
+                  }`}
+                  style={{ backgroundColor: c }}
+                  title={c}
+                />
+              ))}
+              <input
+                type="color"
+                value={customColor}
+                onChange={(e) => { setCustomColor(e.target.value); setDrawingColor(e.target.value); }}
+                className="w-5 h-4 rounded cursor-pointer border-0 p-0 ml-0.5"
+                title="커스텀 색상"
+              />
+            </div>
+
+            <div className="w-px h-5 bg-slate-600/50 shrink-0" />
+
+            {/* 굵기 */}
+            <div className="flex items-center gap-0.5">
+              <span className="text-[9px] font-mono text-slate-500 mr-0.5">굵기</span>
+              {LINE_WIDTHS.map((w) => (
+                <button
+                  key={w}
+                  onClick={() => setDrawingLineWidth(w)}
+                  className={`flex items-center justify-center w-5 h-4 rounded text-[10px] font-mono transition-colors ${
+                    drawingLineWidth === w
+                      ? "bg-orange-500/30 text-orange-300"
+                      : "text-slate-400 hover:text-white hover:bg-slate-700"
+                  }`}
+                  title={`${w}px`}
+                >
+                  <div className="rounded-full bg-current" style={{ width: `${Math.min(w * 2, 10)}px`, height: `${Math.min(w, 4)}px` }} />
+                </button>
+              ))}
+            </div>
+
+            {/* 텍스트 크기 (텍스트 도구 선택 시) */}
+            {drawingTool === "text" && (
+              <>
+                <div className="w-px h-5 bg-slate-600/50 shrink-0" />
+                <div className="flex items-center gap-0.5">
+                  <span className="text-[9px] font-mono text-slate-500 mr-0.5">크기</span>
+                  {[10, 12, 14, 18, 24].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setDrawingFontSize(s)}
+                      className={`px-1 py-0.5 text-[10px] font-mono rounded transition-colors ${
+                        drawingFontSize === s
+                          ? "bg-orange-500/30 text-orange-300"
+                          : "text-slate-400 hover:text-white hover:bg-slate-700"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <div className="w-px h-5 bg-slate-600/50 shrink-0" />
+
+            {/* 선 스타일 */}
+            <div className="flex items-center gap-0.5">
+              {([
+                { key: "solid" as const, label: "───" },
+                { key: "dashed" as const, label: "- - -" },
+                { key: "dotted" as const, label: "· · ·" },
+              ]).map((s) => (
+                <button
+                  key={s.key}
+                  onClick={() => setDrawingLineStyle(s.key)}
+                  className={`px-1 py-0.5 text-[10px] font-mono rounded transition-colors ${
+                    drawingLineStyle === s.key
+                      ? "bg-orange-500/30 text-orange-300"
+                      : "text-slate-400 hover:text-white hover:bg-slate-700"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="w-px h-5 bg-slate-600/50 shrink-0" />
+
+            {/* 액션 */}
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => drawingOverlayRef.current?.undo()}
+                disabled={drawingCount === 0}
+                className="px-1.5 py-0.5 text-[10px] font-mono rounded text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="되돌리기"
+              >
+                ↩ 되돌리기
+              </button>
+              <button
+                onClick={() => drawingOverlayRef.current?.clearAll()}
+                disabled={drawingCount === 0}
+                className="px-1.5 py-0.5 text-[10px] font-mono rounded text-red-400 hover:text-red-300 hover:bg-red-400/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="전체 삭제"
+              >
+                ✕ 전체삭제
+              </button>
+              <span className="text-[9px] font-mono text-slate-500 ml-1">{drawingCount}개</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 메인 캔들/라인 차트 */}
       <div ref={(el) => { (chartContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el; (chartAreaRef as React.MutableRefObject<HTMLDivElement | null>).current = el; }} className={`relative ${drawingMode ? "cursor-crosshair" : isDragging ? "cursor-grabbing" : "cursor-grab"}`} style={{ touchAction: "none", overscrollBehavior: "contain", userSelect: "none" }}>
       {drawingMode && (
         <ChartDrawingOverlay
+          ref={drawingOverlayRef}
           active={drawingMode}
           width={chartDimensions.width || 400}
           height={mainChartHeight}
+          settings={drawingSettings}
+          onDrawingCountChange={setDrawingCount}
         />
       )}
       <ResponsiveContainer width="100%" height={mainChartHeight}>
