@@ -386,9 +386,15 @@ export default function DataPanel() {
     setSelectedIdx(-1);
   };
 
-  const handleSymbolSearch = () => {
+  const handleSymbolSearch = async () => {
     const q = symbolInput.trim();
     if (!q) return;
+
+    // suggestions가 열려있으면 첫 번째 항목 선택
+    if (suggestions.length > 0) {
+      handleSelectSuggestion(suggestions[0].symbol, suggestions[0].name);
+      return;
+    }
 
     let targetSymbol = q.toUpperCase();
     let targetName = "";
@@ -404,6 +410,16 @@ export default function DataPanel() {
       targetName = exact.name;
     } else if (/^\d{6}$/.test(q)) {
       targetSymbol = `${q}.KS`;
+    } else if (/[가-힣]/.test(q)) {
+      // 한글 입력인데 로컬 DB에 없으면 API 검색
+      try {
+        const res = await fetch(`/api/stock/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+          targetSymbol = data.results[0].symbol;
+          targetName = data.results[0].name;
+        }
+      } catch { /* fallback to raw input */ }
     }
 
     setChartSymbol(targetSymbol);

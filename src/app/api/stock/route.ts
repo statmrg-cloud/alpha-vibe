@@ -29,7 +29,7 @@ interface StockResponse {
 
 // 한국 주식 여부 확인
 function isKoreanStock(symbol: string): boolean {
-  return symbol.endsWith(".KS") || symbol.endsWith(".KQ");
+  return symbol.endsWith(".KS") || symbol.endsWith(".KQ") || /[가-힣]/.test(symbol);
 }
 
 // 네이버 콤마 숫자 파싱: "189,300" → 189300
@@ -243,9 +243,31 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const upperSymbol = symbol.toUpperCase().trim();
-  const isKR = isKoreanStock(upperSymbol);
+  let upperSymbol = symbol.toUpperCase().trim();
   const lite = searchParams.get("lite") === "true";  // 경량 모드 (가격만 빠르게)
+
+  // 한글 심볼이 들어오면 네이버 자동완성으로 종목코드 변환
+  if (/[가-힣]/.test(upperSymbol)) {
+    try {
+      const acUrl = `https://ac.stock.naver.com/ac?q=${encodeURIComponent(symbol.trim())}&target=stock`;
+      const acRes = await fetch(acUrl, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        cache: "no-store",
+      });
+      if (acRes.ok) {
+        const acData = await acRes.json();
+        const first = acData?.items?.find(
+          (item: Record<string, string>) => item.nationCode === "KOR" && item.category === "stock"
+        );
+        if (first?.code) {
+          const ext = first.typeCode === "KOSDAQ" ? "KQ" : "KS";
+          upperSymbol = `${first.code}.${ext}`;
+        }
+      }
+    } catch { /* fallback to original */ }
+  }
+
+  const isKR = isKoreanStock(upperSymbol);
 
   // 한국 주식: 네이버증권(실시간) → Yahoo(fallback)
   // 미국 주식: Yahoo → Alpaca(fallback)

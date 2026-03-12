@@ -28,8 +28,29 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const upperSymbol = symbol.toUpperCase().trim();
+  let upperSymbol = symbol.toUpperCase().trim();
   const config = TIMEFRAME_CONFIG[timeframe] || TIMEFRAME_CONFIG["1M"];
+
+  // 한글 심볼이 들어오면 네이버 자동완성으로 종목코드 변환
+  if (/[가-힣]/.test(upperSymbol)) {
+    try {
+      const acUrl = `https://ac.stock.naver.com/ac?q=${encodeURIComponent(symbol.trim())}&target=stock`;
+      const acRes = await fetch(acUrl, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        cache: "no-store",
+      });
+      if (acRes.ok) {
+        const acData = await acRes.json();
+        const first = acData?.items?.find(
+          (item: Record<string, string>) => item.nationCode === "KOR" && item.category === "stock"
+        );
+        if (first?.code) {
+          const ext = first.typeCode === "KOSDAQ" ? "KQ" : "KS";
+          upperSymbol = `${first.code}.${ext}`;
+        }
+      }
+    } catch { /* fallback to original */ }
+  }
 
   try {
     const encoded = encodeURIComponent(upperSymbol);

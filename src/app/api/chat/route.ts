@@ -391,7 +391,7 @@ function extractSymbols(message: string): string[] {
 
 // 한국 주식 여부 확인
 function isKoreanStock(symbol: string): boolean {
-  return symbol.endsWith(".KS") || symbol.endsWith(".KQ");
+  return symbol.endsWith(".KS") || symbol.endsWith(".KQ") || /[가-힣]/.test(symbol);
 }
 
 // 주식 데이터를 컨텍스트 문자열로 변환
