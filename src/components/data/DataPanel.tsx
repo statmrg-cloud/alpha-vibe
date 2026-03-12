@@ -155,6 +155,7 @@ export default function DataPanel() {
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>(loadPriceAlerts);
   const [alertInput, setAlertInput] = useState("");
   const [alertDirection, setAlertDirection] = useState<"below" | "above">("below");
+  const [alertToasts, setAlertToasts] = useState<Array<{ id: number; message: string; name: string }>>([]);
   const [holdingPrices, setHoldingPrices] = useState<Record<string, number>>({});
   const [tradeModal, setTradeModal] = useState<TradeModalState | null>(null);
   const [realTradeModal, setRealTradeModal] = useState<RealTradeModalState | null>(null);
@@ -497,13 +498,35 @@ export default function DataPanel() {
     const priceStr = isKR ? currentPrice.toLocaleString() : `$${currentPrice.toFixed(2)}`;
     const targetStr = isKR ? alert.targetPrice.toLocaleString() : `$${alert.targetPrice.toFixed(2)}`;
     const dirLabel = alert.direction === "below" ? "이하 도달" : "이상 도달";
-    // 브라우저 알림
-    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-      new Notification(`${alert.name} 가격 알림`, {
-        body: `현재가 ${priceStr} (목표 ${targetStr} ${dirLabel})`,
-        icon: "/favicon.ico",
-      });
-    }
+    const message = `현재가 ${priceStr} (목표 ${targetStr} ${dirLabel})`;
+
+    // 1) 브라우저 Notification (탭 비활성 시 유용)
+    try {
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        new Notification(`${alert.name} 가격 알림`, { body: message, icon: "/favicon.ico" });
+      }
+    } catch { /* ignore */ }
+
+    // 2) 화면 내 토스트 팝업 (항상 표시)
+    const toastId = Date.now() + Math.random();
+    setAlertToasts((prev) => [...prev, { id: toastId, message, name: alert.name }]);
+    setTimeout(() => {
+      setAlertToasts((prev) => prev.filter((t) => t.id !== toastId));
+    }, 8000);
+
+    // 3) 소리 알림 (비프음)
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      gain.gain.value = 0.3;
+      osc.start();
+      setTimeout(() => { osc.stop(); ctx.close(); }, 300);
+    } catch { /* audio not available */ }
+
     return { ...alert, triggered: true, triggeredPrice: currentPrice, triggeredAt: new Date().toISOString() };
   };
 
@@ -533,6 +556,7 @@ export default function DataPanel() {
 
     // 가격 알림 체크 — 관심종목에 없는 종목도 별도 fetch
     checkPriceAlerts(updated);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchlistSymbols]);
 
   useEffect(() => {
@@ -1233,6 +1257,30 @@ export default function DataPanel() {
           </div>
         </Card>
       </div>
+
+      {/* 가격 알림 토스트 팝업 */}
+      {alertToasts.length > 0 && (
+        <div className="fixed top-4 right-4 z-[9999] space-y-2" style={{ maxWidth: 360 }}>
+          {alertToasts.map((toast) => (
+            <div
+              key={toast.id}
+              className="bg-yellow-500/95 text-black rounded-lg shadow-2xl px-4 py-3 animate-in slide-in-from-right font-mono"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">&#x1F514;</span>
+                <span className="font-bold text-sm">{toast.name}</span>
+              </div>
+              <div className="text-xs opacity-80">{toast.message}</div>
+              <button
+                onClick={() => setAlertToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+                className="absolute top-2 right-2 text-black/50 hover:text-black text-xs"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 모의투자 거래 모달 */}
       {tradeModal && (
