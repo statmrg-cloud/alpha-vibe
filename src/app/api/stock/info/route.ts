@@ -308,9 +308,10 @@ async function fetchUSStockInfo(symbol: string): Promise<StockInfoResponse> {
   };
 
   try {
-    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(
+    // v8/chart API — v10/quoteSummary requires authentication now
+    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
       symbol
-    )}?modules=defaultKeyStatistics,financialData,summaryDetail,price`;
+    )}?interval=1d&range=5d`;
 
     const res = await fetch(url, {
       headers: YAHOO_HEADERS,
@@ -323,40 +324,35 @@ async function fetchUSStockInfo(symbol: string): Promise<StockInfoResponse> {
     }
 
     const data = await res.json();
-    const quoteSummary = data?.quoteSummary?.result?.[0];
-    if (!quoteSummary) return result;
+    const meta = data?.chart?.result?.[0]?.meta;
+    if (!meta) return result;
 
-    const price = quoteSummary.price || {};
-    const summaryDetail = quoteSummary.summaryDetail || {};
-    const keyStats = quoteSummary.defaultKeyStatistics || {};
-    const financialData = quoteSummary.financialData || {};
+    const indicators = data?.chart?.result?.[0]?.indicators?.quote?.[0];
+    const timestamps = data?.chart?.result?.[0]?.timestamp || [];
+    const lastIdx = timestamps.length - 1;
 
     // Name
-    result.name = price.shortName || price.longName || symbol;
+    result.name = meta.shortName || meta.longName || symbol;
 
     // Market data
     result.marketData = {
-      open: extractYahooRaw(price.regularMarketOpen) ?? extractYahooRaw(summaryDetail.open),
-      close: extractYahooRaw(price.regularMarketPrice) ?? null,
-      high: extractYahooRaw(price.regularMarketDayHigh) ?? extractYahooRaw(summaryDetail.dayHigh),
-      low: extractYahooRaw(price.regularMarketDayLow) ?? extractYahooRaw(summaryDetail.dayLow),
-      volume: extractYahooRaw(price.regularMarketVolume) ?? extractYahooRaw(summaryDetail.volume),
-      tradingValue: null, // Yahoo doesn't provide trading value directly
+      open: indicators?.open?.[lastIdx] ?? null,
+      close: meta.regularMarketPrice ?? null,
+      high: indicators?.high?.[lastIdx] ?? null,
+      low: indicators?.low?.[lastIdx] ?? null,
+      volume: indicators?.volume?.[lastIdx] ?? null,
+      tradingValue: null,
     };
 
-    // Metrics
+    // Metrics — limited data from chart API
     result.metrics = {
-      marketCap: extractYahooRaw(price.marketCap) ?? null,
-      dividendYield: extractYahooRaw(summaryDetail.dividendYield)
-        ? (extractYahooRaw(summaryDetail.dividendYield)! * 100)
-        : null,
-      pbr: extractYahooRaw(keyStats.priceToBook) ?? null,
-      per: extractYahooRaw(summaryDetail.trailingPE) ?? extractYahooRaw(keyStats.trailingPE) ?? null,
-      roe: extractYahooRaw(financialData.returnOnEquity)
-        ? (extractYahooRaw(financialData.returnOnEquity)! * 100)
-        : null,
-      psr: extractYahooRaw(keyStats.priceToSalesTrailing12Months) ?? null,
-      foreignOwnership: null, // Not applicable for US stocks
+      marketCap: null,
+      dividendYield: null,
+      pbr: null,
+      per: null,
+      roe: null,
+      psr: null,
+      foreignOwnership: null,
     };
 
     // Order book / investor trends not available from Yahoo
@@ -368,17 +364,6 @@ async function fetchUSStockInfo(symbol: string): Promise<StockInfoResponse> {
   }
 
   return result;
-}
-
-// Yahoo returns values as { raw: 123.45, fmt: "123.45" }
-function extractYahooRaw(field: unknown): number | null {
-  if (field === undefined || field === null) return null;
-  if (typeof field === "number") return field;
-  if (typeof field === "object" && field !== null && "raw" in field) {
-    const raw = (field as { raw: unknown }).raw;
-    if (typeof raw === "number") return raw;
-  }
-  return null;
 }
 
 // ─── API Handler ───

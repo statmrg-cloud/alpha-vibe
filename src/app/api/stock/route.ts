@@ -164,6 +164,10 @@ async function fetchFromNaver(symbol: string): Promise<StockResponse> {
 async function fetchFromYahoo(symbol: string): Promise<StockResponse> {
   const quote = await yf.quote(symbol);
 
+  if (!quote || !quote.symbol) {
+    throw new Error(`Yahoo Finance returned no data for ${symbol}`);
+  }
+
   return {
     symbol: quote.symbol,
     name: quote.shortName || quote.longName || symbol,
