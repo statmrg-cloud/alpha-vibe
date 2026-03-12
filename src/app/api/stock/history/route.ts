@@ -33,10 +33,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const encoded = encodeURIComponent(upperSymbol);
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=${config.interval}&range=${config.range}`;
+    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encoded}?interval=${config.interval}&range=${config.range}`;
     const res = await fetch(url, {
       cache: "no-store",
-      headers: { "User-Agent": "Mozilla/5.0" },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Origin": "https://finance.yahoo.com",
+        "Referer": "https://finance.yahoo.com/",
+      },
     });
 
     if (!res.ok) {

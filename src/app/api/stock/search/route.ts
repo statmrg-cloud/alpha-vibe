@@ -4,7 +4,14 @@ export const dynamic = "force-dynamic";
 
 const HEADERS = {
   "User-Agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+};
+
+const YAHOO_HEADERS = {
+  ...HEADERS,
+  "Origin": "https://finance.yahoo.com",
+  "Referer": "https://finance.yahoo.com/",
+  "Accept": "application/json",
 };
 
 interface SearchResult {
@@ -45,8 +52,8 @@ async function searchNaver(query: string): Promise<SearchResult[]> {
 // Yahoo Finance REST Search API — 미국 및 글로벌 주식
 async function searchYahoo(query: string): Promise<SearchResult[]> {
   try {
-    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=15&newsCount=0`;
-    const res = await fetch(url, { headers: HEADERS, cache: "no-store" });
+    const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=15&newsCount=0`;
+    const res = await fetch(url, { headers: YAHOO_HEADERS, cache: "no-store" });
     if (!res.ok) return [];
     const data = await res.json();
 

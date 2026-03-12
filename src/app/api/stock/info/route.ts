@@ -4,7 +4,14 @@ export const dynamic = "force-dynamic";
 
 const HEADERS = {
   "User-Agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+};
+
+const YAHOO_HEADERS = {
+  ...HEADERS,
+  "Origin": "https://finance.yahoo.com",
+  "Referer": "https://finance.yahoo.com/",
+  "Accept": "application/json",
 };
 
 // 한국 주식 여부 확인
@@ -301,12 +308,12 @@ async function fetchUSStockInfo(symbol: string): Promise<StockInfoResponse> {
   };
 
   try {
-    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(
+    const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(
       symbol
     )}?modules=defaultKeyStatistics,financialData,summaryDetail,price`;
 
     const res = await fetch(url, {
-      headers: HEADERS,
+      headers: YAHOO_HEADERS,
       cache: "no-store",
     });
 

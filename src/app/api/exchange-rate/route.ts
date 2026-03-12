@@ -14,8 +14,15 @@ export async function GET() {
 
     // Yahoo Finance에서 USD/KRW 환율 조회
     const res = await fetch(
-      "https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d&range=1d",
-      { cache: "no-store" }
+      "https://query2.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d&range=1d",
+      {
+        cache: "no-store",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          "Origin": "https://finance.yahoo.com",
+          "Referer": "https://finance.yahoo.com/",
+        },
+      }
     );
 
     if (res.ok) {

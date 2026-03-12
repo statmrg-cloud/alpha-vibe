@@ -53,10 +53,14 @@ async function fetchYahooQuote(symbol: string): Promise<{
     const encoded = encodeURIComponent(symbol);
     // range=1d로 조회해야 chartPreviousClose가 전일 종가를 정확히 반환
     // range=5d를 사용하면 5일 전 종가 대비로 변동률이 크게 부풀려짐
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=1d`;
+    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encoded}?interval=1d&range=1d`;
     const res = await fetch(url, {
       cache: "no-store",
-      headers: { "User-Agent": "Mozilla/5.0" },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Origin": "https://finance.yahoo.com",
+        "Referer": "https://finance.yahoo.com/",
+      },
     });
     if (!res.ok) return null;
     const data = await res.json();
