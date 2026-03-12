@@ -328,7 +328,7 @@ export default function DataPanel() {
         item.keywords.some((kw) => kw.includes(q.toLowerCase()))
     ).slice(0, 5);
     setSuggestions(localMatched);
-    setShowSuggestions(localMatched.length > 0);
+    setShowSuggestions(true);
     setSelectedIdx(-1);
 
     // API 검색 (디바운스 300ms)
