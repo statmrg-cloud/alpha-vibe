@@ -101,8 +101,27 @@ const ChartDrawingOverlay = forwardRef<ChartDrawingOverlayHandle, ChartDrawingOv
 
     const widthRef = useRef(width);
     const heightRef = useRef(height);
-    useEffect(() => { widthRef.current = width; }, [width]);
-    useEffect(() => { heightRef.current = height; }, [height]);
+
+    // 부모 요소(캔버스)의 실제 크기를 ResizeObserver로 추적
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas?.parentElement) return;
+      const parent = canvas.parentElement;
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const w = entry.contentRect.width;
+          const h = entry.contentRect.height;
+          if (w > 0) widthRef.current = w;
+          if (h > 0) heightRef.current = h;
+        }
+      });
+      observer.observe(parent);
+      return () => observer.disconnect();
+    }, []);
+
+    // prop 변경 시에도 반영
+    useEffect(() => { if (width > 0) widthRef.current = width; }, [width]);
+    useEffect(() => { if (height > 0) heightRef.current = height; }, [height]);
 
     // ─── imperative handle ─────────────────────────────
     useImperativeHandle(ref, () => ({
@@ -309,16 +328,33 @@ const ChartDrawingOverlay = forwardRef<ChartDrawingOverlayHandle, ChartDrawingOv
       ctx.restore();
     }, [getCtx, applyDpr, drawOne, setCtxLineDash]);
 
-    // 캔버스 크기 동기화
+    // 캔버스 크기 동기화 (부모 요소 실제 크기 기준)
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
+      const parent = canvas.parentElement;
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-      renderFrame();
+
+      const syncSize = () => {
+        const w = parent ? parent.clientWidth : width;
+        const h = parent ? parent.clientHeight : height;
+        if (w <= 0 || h <= 0) return;
+        widthRef.current = w;
+        heightRef.current = h;
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = `${w}px`;
+        canvas.style.height = `${h}px`;
+        renderFrame();
+      };
+
+      syncSize();
+
+      if (parent) {
+        const observer = new ResizeObserver(() => syncSize());
+        observer.observe(parent);
+        return () => observer.disconnect();
+      }
     }, [width, height, renderFrame]);
 
     const scheduleRender = useCallback(() => {
@@ -514,8 +550,8 @@ const ChartDrawingOverlay = forwardRef<ChartDrawingOverlayHandle, ChartDrawingOv
           ref={canvasRef}
           className="absolute top-0 left-0"
           style={{
-            width: `${width}px`,
-            height: `${height}px`,
+            width: "100%",
+            height: "100%",
             cursor,
             pointerEvents: active ? "auto" : "none",
             zIndex: 15,
